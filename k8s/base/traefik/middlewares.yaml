@@ -64,3 +64,45 @@ metadata:
 spec:
   basicAuth:
     secret: traefik-dashboard-auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+  namespace: traefik-system
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  rateLimit:
+    average: 50
+    burst: 100
+    period: 1m
+    sourceCriterion:
+      requestHeaderName: CF-Connecting-IP
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: crowdsec-bouncer
+  namespace: traefik-system
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  plugin:
+    crowdsec-bouncer:
+      crowdsecLapiScheme: http
+      crowdsecLapiHost: crowdsec-service.crowdsec:8080
+      crowdsecLapiKey: 45quR62Xp91t3XHh+O/Oq8XaIorc7QwOcT5gNNd7FxI
+      clientTrustedIPs:
+        - "100.64.0.0/10"
+        - "192.168.192.0/20"
+      forwardedHeadersTrustedIPs:
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
+      forwardedHeadersCustomName: CF-Connecting-IP

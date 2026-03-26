@@ -15,9 +15,11 @@ spec:
     - match: Host(`photos.ukkiee.dev`)
       kind: Rule
       middlewares:
-        - name: tailscale-only
-          namespace: traefik-system
         - name: security-headers
+          namespace: traefik-system
+        - name: rate-limit
+          namespace: traefik-system
+        - name: crowdsec-bouncer
           namespace: traefik-system
       services:
         - name: immich-server
