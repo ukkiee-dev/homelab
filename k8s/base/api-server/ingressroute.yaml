@@ -1,0 +1,24 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: api-server
+  labels:
+    app.kubernetes.io/name: api-server
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`api.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: tailscale-only
+          namespace: traefik-system
+        - name: security-headers
+          namespace: traefik-system
+      services:
+        - name: api-server
+          port: 3000

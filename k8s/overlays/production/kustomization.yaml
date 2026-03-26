@@ -22,6 +22,7 @@ resources:
   - ../../base/portainer
   - ../../base/dozzle
   - ../../base/immich
+  - ../../base/api-server
 
   # CI/CD
   - ../../base/arc-runners
