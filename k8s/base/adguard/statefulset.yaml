@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: adguard
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: adguard
+    app.kubernetes.io/component: dns
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  serviceName: adguard
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: adguard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adguard
+        app.kubernetes.io/component: dns
+        app.kubernetes.io/part-of: homelab
+        app.kubernetes.io/managed-by: argocd
+    spec:
+      # AdGuard needs root for DNS port 53 binding
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: adguard
+          image: adguard/adguardhome:v0.107.73
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: dns-tcp
+              containerPort: 53
+              protocol: TCP
+              hostPort: 53
+            - name: dns-udp
+              containerPort: 53
+              protocol: UDP
+              hostPort: 53
+          env:
+            - name: TZ
+              value: Asia/Seoul
+          volumeMounts:
+            - name: conf
+              mountPath: /opt/adguardhome/conf
+            - name: work
+              mountPath: /opt/adguardhome/work
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              add: ["NET_BIND_SERVICE"]
+              drop: ["ALL"]
+  volumeClaimTemplates:
+    - metadata:
+        name: conf
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 256Mi
+    - metadata:
+        name: work
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi

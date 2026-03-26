@@ -1,0 +1,40 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: homepage
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: homepage
+    app.kubernetes.io/component: web
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`home.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: tailscale-only
+          namespace: traefik-system
+        - name: security-headers
+          namespace: traefik-system
+        - name: gzip
+          namespace: traefik-system
+      services:
+        - name: homepage
+          port: 3000
+    # Blue-Green preview (새 버전 미리 확인)
+    - match: Host(`preview-home.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: tailscale-only
+          namespace: traefik-system
+        - name: security-headers
+          namespace: traefik-system
+        - name: gzip
+          namespace: traefik-system
+      services:
+        - name: homepage-preview
+          port: 3000

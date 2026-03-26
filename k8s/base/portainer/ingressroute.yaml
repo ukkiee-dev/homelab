@@ -1,0 +1,25 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: portainer
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: portainer
+    app.kubernetes.io/component: management
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`portainer.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: tailscale-only
+          namespace: traefik-system
+        - name: security-headers
+          namespace: traefik-system
+      services:
+        - name: portainer
+          port: 9000
