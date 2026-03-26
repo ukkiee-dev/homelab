@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sealed-secrets-helm-values
+  namespace: sealed-secrets
+  labels:
+    app.kubernetes.io/name: sealed-secrets
+    app.kubernetes.io/component: secrets
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+data:
+  values.yaml: |
+    fullnameOverride: sealed-secrets-controller
