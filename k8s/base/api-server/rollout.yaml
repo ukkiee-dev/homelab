@@ -17,7 +17,10 @@ spec:
     blueGreen:
       activeService: api-server
       previewService: api-server-preview
-      autoPromotionEnabled: false
+      autoPromotionEnabled: true
+      prePromotionAnalysis:
+        templates:
+          - templateName: api-server-health
       scaleDownDelaySeconds: 30
   template:
     metadata:
