@@ -1,0 +1,37 @@
+# Infisical Standalone
+# 외부 PostgreSQL + Redis 사용 (자체 내장 비활성화)
+
+infisical:
+  replicaCount: 1
+  envSecretName: infisical-secrets
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  startupProbe:
+    httpGet:
+      path: /api/status
+      port: 8080
+    failureThreshold: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+  readinessProbe:
+    failureThreshold: 6
+    periodSeconds: 10
+    timeoutSeconds: 5
+
+# 자체 내장 DB/Redis 비활성화
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+# 외부 서비스 연결은 infisical-secrets Secret에서 환경변수로 주입
+ingress:
+  enabled: false
+  nginx:
+    enabled: false

@@ -36,11 +36,13 @@
 
 ## Phase 1-D: 기타 ✅
 
-- [x] Traefik metrics 활성화 (`metrics.prometheus` values.yaml에 추가)
+- [x] Traefik metrics 활성화 + Helm upgrade 적용
+- [x] Traefik PodMonitor 생성
+- [x] Cloudflared PodMonitor 생성
+- [x] monitoring namespace NetworkPolicy 8개 배포
 - [x] `backup.sh`에 Monitoring 상태 확인 추가
-- [ ] monitoring namespace NetworkPolicy (후속 — 현재 동작 우선)
-- [ ] Cloudflared PodMonitor 추가 (후속)
-- [ ] Grafana 대시보드 접속 확인 (Bitwarden에서 admin 비밀번호 사용)
+- [x] Grafana 접속 확인
+- [x] Bitwarden에 Grafana + Telegram Bot Token 저장 (Homelab 폴더)
 
 ---
 
