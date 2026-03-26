@@ -71,20 +71,31 @@ alertmanager:
       repeat_interval: 4h
       routes:
         - match:
+            alertname: Watchdog
+          receiver: "null"
+        - match:
+            alertname: InfoInhibitor
+          receiver: "null"
+        - match:
             severity: critical
           receiver: telegram
           repeat_interval: 1h
     receivers:
+      - name: "null"
       - name: telegram
         telegram_configs:
           - bot_token_file: /etc/alertmanager/secrets/telegram-bot-token/telegram-bot-token
             chat_id: 8001733025
             parse_mode: HTML
+            send_resolved: true
             message: |
               {{ range .Alerts }}
-              <b>{{ .Labels.alertname }}</b>
-              {{ .Annotations.summary }}
-              Severity: {{ .Labels.severity }}
+              {{ if eq .Status "firing" }}🔥 <b>[발생]</b>{{ else }}✅ <b>[해소]</b>{{ end }} <b>{{ .Labels.alertname }}</b>
+              {{ if .Annotations.summary }}📋 {{ .Annotations.summary }}{{ end }}
+              {{ if .Annotations.description }}💬 {{ .Annotations.description }}{{ end }}
+              🏷 심각도: {{ .Labels.severity }}
+              📦 네임스페이스: {{ .Labels.namespace }}
+              🕐 {{ if eq .Status "firing" }}발생: {{ .StartsAt.Local.Format "2006-01-02 15:04:05" }}{{ else }}해소: {{ .EndsAt.Local.Format "2006-01-02 15:04:05" }}{{ end }}
               {{ end }}
   alertmanagerSpec:
     secrets:
