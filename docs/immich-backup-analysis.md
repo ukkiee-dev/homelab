@@ -128,7 +128,21 @@ DNS 레코드 추가 전에 발생한 NXDOMAIN 응답이 AdGuard에 캐시됨.
 3. 긴급 우회: `/etc/hosts`에 `104.21.14.177 photos.ukkiee.dev` 추가 (임시)
 
 > 새 서브도메인 추가 시 항상 AdGuard 캐시를 먼저 비울 것.
-> Cloudflare Tunnel Public Hostname 추가 시 DNS CNAME이 자동 생성되므로 별도 DNS 레코드 추가 불필요.
+
+#### DNS 아키텍처 (2026-03-26 확정)
+
+```
+내부 서비스 (Tailscale-only):
+  A 레코드 → 100.112.20.3 (Tailscale IP, DNS only)
+  status, grafana, secrets, argo, dns, logs, portainer, traefik, vault
+
+공개 서비스 (Cloudflare Tunnel):
+  CNAME → Tunnel (Proxied)
+  api, home, photos
+```
+
+> 내부 서비스는 Tailscale 망 밖에서 접근 불가 (A 레코드가 Tailscale IP를 가리키므로).
+> 공개 서비스는 Cloudflare Tunnel + WAF를 경유하여 오리진 IP 비노출.
 
 ---
 
