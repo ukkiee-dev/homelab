@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-api-egress
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: network-policies
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - dozzle
+          - homepage
+          - portainer
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to Kubernetes API server
+    # OrbStack uses 26443, standard K3s uses 6443, default uses 443
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 26443

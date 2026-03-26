@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-adguard-dns
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: network-policies
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: adguard
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow DNS port access from all sources
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    # Allow web UI access from Traefik
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik-system
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    # Allow upstream DNS server communication
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 443
+        - protocol: UDP
+          port: 443

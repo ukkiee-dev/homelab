@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-ingress
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: network-policies
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic only from traefik-system namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik-system
+      ports:
+        - protocol: TCP
+          port: 3000   # homepage
+        - protocol: TCP
+          port: 3001   # uptime-kuma
+        - protocol: TCP
+          port: 8080   # dozzle
+        - protocol: TCP
+          port: 9000   # portainer

@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: traefik-system
+  labels:
+    app.kubernetes.io/name: network-policies
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow external traffic (LoadBalancer/NodePort)
+    - ports:
+        - protocol: TCP
+          port: 8000   # web (HTTP)
+        - protocol: TCP
+          port: 8443   # websecure (HTTPS)
+  egress:
+    # Allow DNS lookups
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow traffic to apps namespace backends
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: apps
+    # Allow traffic to networking namespace (cloudflared etc.)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: networking
+    # Allow traffic to argocd namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argocd
+    # Let's Encrypt ACME challenge
+    - ports:
+        - protocol: TCP
+          port: 443
