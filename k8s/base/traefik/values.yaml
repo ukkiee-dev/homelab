@@ -36,6 +36,12 @@ ports:
     exposedPort: 443
     protocol: TCP
 
+experimental:
+  plugins:
+    crowdsec-bouncer:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.4.2
+
 additionalArguments:
   - "--certificatesresolvers.cloudflare.acme.email=admin@ukkiee.dev"
   - "--certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json"
@@ -44,6 +50,10 @@ additionalArguments:
   - "--api.dashboard=true"
   - "--ping=true"
   - "--log.level=WARN"
+  - "--accesslog=true"
+  - "--accesslog.format=json"
+  - "--accesslog.fields.headers.names.CF-Connecting-IP=keep"
+  - "--accesslog.fields.headers.names.User-Agent=keep"
   - "--entrypoints.websecure.http.tls=true"
   - "--entrypoints.websecure.http.tls.certresolver=cloudflare"
   - "--entrypoints.websecure.http.tls.domains[0].main=ukkiee.dev"
@@ -61,10 +71,6 @@ persistence:
   name: letsencrypt
   path: /letsencrypt
   size: 128Mi
-
-metrics:
-  prometheus:
-    entryPoint: metrics
 
 ingressRoute:
   dashboard:
