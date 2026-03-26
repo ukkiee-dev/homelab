@@ -1,0 +1,18 @@
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: api-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: api-server
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  applicationRefs:
+    - namePattern: api-server
+      images:
+        - alias: api
+          imageName: ghcr.io/ukkiee-dev/api-server:latest
+          commonUpdateSettings:
+            updateStrategy: digest

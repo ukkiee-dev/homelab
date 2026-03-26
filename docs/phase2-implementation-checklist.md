@@ -19,8 +19,10 @@
 - [x] ArgoCD Application 생성
 - [x] 배포 + `/health/ping` 정상 확인
 
-## Phase 2-C: ArgoCD Image Updater ⬜
+## Phase 2-C: ArgoCD Image Updater 🔄
 
-- [ ] Image Updater Helm 배포
-- [ ] ArgoCD Application에 어노테이션 추가
-- [ ] 코드 push → GHCR 태그 → ArgoCD 자동 업데이트 검증
+- [x] Image Updater Helm 배포 (v1.1.1, CRD 기반)
+- [x] ImageUpdater CR 생성 (api-server)
+- [ ] ArgoCD GitOps 연결 후 자동 업데이트 검증
+  - ArgoCD가 private repo에 접근하려면 repo credentials 설정 필요
+  - 현재 매니페스트는 수동 kubectl apply로 배포된 상태

@@ -1,0 +1,15 @@
+config:
+  registries:
+    - name: GHCR
+      api_url: https://ghcr.io
+      prefix: ghcr.io
+      credentials: pullsecret:argocd/ghcr-pull-secret
+      default: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

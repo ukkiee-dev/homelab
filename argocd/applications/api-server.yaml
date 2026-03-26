@@ -8,6 +8,10 @@ metadata:
     app.kubernetes.io/component: api
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: api=ghcr.io/ukkiee-dev/api-server
+    argocd-image-updater.argoproj.io/api.update-strategy: latest
+    argocd-image-updater.argoproj.io/write-back-method: argocd
 spec:
   project: default
   source:
