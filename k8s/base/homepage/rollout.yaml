@@ -50,13 +50,13 @@ spec:
             - name: HOMEPAGE_VAR_ADGUARD_USER
               valueFrom:
                 secretKeyRef:
-                  name: adguard
-                  key: adguard-username
+                  name: infisical-managed-apps
+                  key: ADGUARD_USERNAME
             - name: HOMEPAGE_VAR_ADGUARD_PASS
               valueFrom:
                 secretKeyRef:
-                  name: adguard
-                  key: adguard
+                  name: infisical-managed-apps
+                  key: ADGUARD_PASSWORD
           volumeMounts:
             - name: config
               mountPath: /app/config
