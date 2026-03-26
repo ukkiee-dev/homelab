@@ -19,10 +19,13 @@ data:
     layout:
       Services:
         style: row
-        columns: 3
+        columns: 4
       Infrastructure:
         style: row
         columns: 5
+      Monitoring:
+        style: row
+        columns: 3
 
   widgets.yaml: |
     - resources:
@@ -36,6 +39,14 @@ data:
 
   services.yaml: |
     - Services:
+        - Immich:
+            icon: immich.png
+            href: https://photos.ukkiee.dev
+            description: Photo & Video Backup
+            widget:
+              type: immich
+              url: http://immich-server.immich.svc.cluster.local:2283
+              key: "{{HOMEPAGE_VAR_IMMICH_API_KEY}}"
         - Uptime Kuma:
             icon: uptime-kuma.png
             href: https://status.ukkiee.dev
@@ -53,26 +64,42 @@ data:
               url: http://adguard.apps.svc.cluster.local:3000
               username: "{{HOMEPAGE_VAR_ADGUARD_USER}}"
               password: "{{HOMEPAGE_VAR_ADGUARD_PASS}}"
+        - API Server:
+            icon: mdi-api
+            href: https://api.ukkiee.dev/health/ping
+            description: NestJS API
     - Infrastructure:
         - Traefik:
             icon: traefik.png
             href: https://traefik.ukkiee.dev
             description: Reverse Proxy
-        - Portainer:
-            icon: portainer.png
-            href: https://portainer.ukkiee.dev
-            description: Container Management
         - ArgoCD:
             icon: sh-argo-cd.png
             href: https://argo.ukkiee.dev
             description: GitOps
+        - Infisical:
+            icon: mdi-shield-lock
+            href: https://secrets.ukkiee.dev
+            description: Secret Management
+        - Portainer:
+            icon: portainer.png
+            href: https://portainer.ukkiee.dev
+            description: Container Management
+        - Cloudflare Tunnel:
+            icon: cloudflare.png
+            description: External Access
+    - Monitoring:
+        - Grafana:
+            icon: grafana.png
+            href: https://grafana.ukkiee.dev
+            description: Metrics & Logs
         - Dozzle:
             icon: dozzle.png
             href: https://logs.ukkiee.dev
             description: Log Viewer
-        - Cloudflare Tunnel:
-            icon: cloudflare.png
-            description: External Access
+        - Prometheus:
+            icon: prometheus.png
+            description: Metrics Collection
 
   bookmarks.yaml: |
     - Developer:

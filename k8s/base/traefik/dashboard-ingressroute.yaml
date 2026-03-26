@@ -16,7 +16,6 @@ spec:
       kind: Rule
       middlewares:
         - name: tailscale-only
-        - name: traefik-auth
         - name: security-headers
         - name: gzip
       services:
