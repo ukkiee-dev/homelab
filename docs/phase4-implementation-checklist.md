@@ -32,8 +32,8 @@
   - R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT
   - POSTGRESQL_PASSWORD, GRAFANA_ADMIN_PASSWORD, TELEGRAM_BOT_TOKEN
   - INFISICAL_ENCRYPTION_KEY, INFISICAL_AUTH_SECRET
-- [ ] InfisicalSecret CRD로 K8s Secret 자동 동기화 설정
-- [ ] 검증
+- [x] InfisicalSecret CRD 배포 (apps, immich, monitoring)
+- [x] 3개 namespace에서 10개 시크릿 자동 동기화 확인 (60초 간격)
 
 ## Phase 4-E: SealedSecrets 제거 ⬜
 
