@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgresql-backup
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  schedule: "0 18 * * *"  # 03:00 KST
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pgdump
+              image: bitnami/postgresql:latest
+              command:
+                - sh
+                - -c
+                - |
+                  echo "=== pg_dump started at $(date) ==="
+                  # api database
+                  PGPASSWORD="$PG_PASSWORD" pg_dump -h postgresql -U postgres -Fc api > /backups/api-$(date +%Y%m%d).sql
+                  # infisical database
+                  PGPASSWORD="$PG_PASSWORD" pg_dump -h postgresql -U postgres -Fc infisical > /backups/infisical-$(date +%Y%m%d).sql
+                  # 7일 이전 삭제
+                  find /backups -name "*.sql" -mtime +7 -delete
+                  echo "=== pg_dump completed ==="
+                  ls -lh /backups/
+              env:
+                - name: PG_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgresql-auth
+                      key: postgres-password
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: postgresql-backups
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-backups
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/part-of: homelab
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
