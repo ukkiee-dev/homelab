@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tailscale-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: tailscale-operator
+    app.kubernetes.io/component: vpn
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  project: default
+  sources:
+    - chart: tailscale-operator
+      repoURL: https://pkgs.tailscale.com/helmcharts
+      targetRevision: "1.*"
+      helm:
+        valueFiles:
+          - $values/k8s/base/tailscale-operator/values.yaml
+    - repoURL: https://github.com/ukkiee-dev/homelab.git
+      targetRevision: main
+      path: k8s/base/tailscale-operator
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale-system
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true

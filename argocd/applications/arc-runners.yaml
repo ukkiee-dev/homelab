@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arc-runners
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: arc-runners
+    app.kubernetes.io/component: cicd
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ukkiee-dev/homelab.git
+    targetRevision: main
+    path: k8s/base/arc-runners
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: actions-runner-system
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true

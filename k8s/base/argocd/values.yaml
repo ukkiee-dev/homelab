@@ -1,0 +1,59 @@
+# ArgoCD Helm Values
+# helm repo add argo https://argoproj.github.io/argo-helm
+# helm install argocd argo/argo-cd -n argocd -f values.yaml
+
+configs:
+  cm:
+    url: https://argo.ukkiee.dev
+    accounts.ukkiee: apiKey, login
+  rbac:
+    policy.csv: |
+      g, ukkiee, role:admin
+
+server:
+  extraArgs:
+    - --insecure  # Traefik handles TLS
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+applicationSet:
+  enabled: false

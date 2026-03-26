@@ -1,0 +1,43 @@
+# ARC Runner Scale Set Helm Values
+# helm install arc-runner-set \
+#   --namespace actions-runner-system \
+#   oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
+#   -f values-runner.yaml
+
+githubConfigUrl: "https://github.com/ukkiee-dev"
+
+# GitHub App auth (recommended) or PAT
+# GitHub App:
+# githubConfigSecret:
+#   github_app_id: ""
+#   github_app_installation_id: ""
+#   github_app_private_key: ""
+
+# PAT:
+githubConfigSecret:
+  github_token: ""  # Replace with SealedSecret
+
+runnerGroup: "ukkiee"
+
+maxRunners: 3
+minRunners: 0
+
+template:
+  spec:
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:2.333.0
+        command: ["/home/runner/run.sh"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+          limits:
+            cpu: "4"
+            memory: 4Gi
+
+containerMode:
+  type: "dind"  # Docker-in-Docker
+
+# Runner labels
+# In GitHub Actions use: runs-on: [self-hosted, Linux, ARM64, k8s]

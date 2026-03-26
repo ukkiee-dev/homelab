@@ -1,0 +1,25 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: gitops
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`argo.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: tailscale-only
+          namespace: traefik-system
+        - name: security-headers
+          namespace: traefik-system
+      services:
+        - name: argocd-server
+          port: 80
