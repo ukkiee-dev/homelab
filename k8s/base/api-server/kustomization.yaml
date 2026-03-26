@@ -4,5 +4,6 @@ kind: Kustomization
 namespace: apps
 
 resources:
-  - deployment.yaml
+  - rollout.yaml
   - ingressroute.yaml
+  - image-updater.yaml

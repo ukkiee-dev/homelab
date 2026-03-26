@@ -1,5 +1,5 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: api-server
   labels:
@@ -9,11 +9,16 @@ metadata:
     app.kubernetes.io/managed-by: argocd
 spec:
   replicas: 1
-  strategy:
-    type: RollingUpdate
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: api-server
+  strategy:
+    blueGreen:
+      activeService: api-server
+      previewService: api-server-preview
+      autoPromotionEnabled: false
+      scaleDownDelaySeconds: 30
   template:
     metadata:
       labels:
@@ -59,6 +64,23 @@ apiVersion: v1
 kind: Service
 metadata:
   name: api-server
+  labels:
+    app.kubernetes.io/name: api-server
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  selector:
+    app.kubernetes.io/name: api-server
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-server-preview
   labels:
     app.kubernetes.io/name: api-server
     app.kubernetes.io/component: api
