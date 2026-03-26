@@ -95,9 +95,11 @@
 - [ ] (Phase 1 이후) AlertManager 규칙 추가
 - [x] ~~모바일 앱 자동 백업~~ — 사용 안 함
 
-## Git 커밋 ⬜
+## Git 커밋 ✅
 
-- [ ] 전체 매니페스트 + 문서 커밋
+- [x] GitHub repo 생성 (`ukkiee-dev/homelab`, private)
+- [x] 9개 그룹별 커밋 (scaffolding → infra → apps → immich → monitoring → docs)
+- [x] Push to origin/main
 
 ---
 
