@@ -35,6 +35,8 @@
 - [x] InfisicalSecret CRD 배포 (apps, immich, monitoring)
 - [x] 3개 namespace에서 10개 시크릿 자동 동기화 확인 (60초 간격)
 
-## Phase 4-E: SealedSecrets 제거 ⬜
+## Phase 4-E: SealedSecrets 제거 ✅
 
-- [ ] InfisicalSecret CRD 동기화 검증 후 제거
+- [x] SealedSecrets 매니페스트 삭제 (`k8s/base/sealed-secrets/`)
+- [x] `scripts/seal-secret.sh` 삭제
+- [x] SealedSecrets Controller/namespace 미존재 확인
