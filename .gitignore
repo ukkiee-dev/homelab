@@ -17,6 +17,9 @@ backups/
 # Data files (runtime generated)
 adguard/work/
 homepage/config/logs/
+portainer/data/
+uptime-kuma/data/
+vaultwarden/data/
 
 # K8s secrets (plain text - SealedSecret만 커밋)
 **/secret.yaml
