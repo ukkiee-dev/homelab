@@ -30,8 +30,8 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: immich-db
-                  key: password
+                  name: infisical-managed-immich
+                  key: IMMICH_DB_PASSWORD
             - name: POSTGRES_DB
               value: immich
             - name: POSTGRES_INITDB_ARGS
