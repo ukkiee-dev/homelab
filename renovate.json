@@ -1,0 +1,50 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "kubernetes": {
+    "fileMatch": ["k8s/.+\\.yaml$"]
+  },
+  "helm-values": {
+    "fileMatch": ["k8s/.+values\\.yaml$"]
+  },
+  "argocd": {
+    "fileMatch": ["argocd/.+\\.yaml$"]
+  },
+  "packageRules": [
+    {
+      "description": "Auto-merge patch updates for non-critical services",
+      "matchUpdateTypes": ["patch"],
+      "matchPackagePatterns": ["homepage", "dozzle", "uptime-kuma"],
+      "automerge": true
+    },
+    {
+      "description": "Group all infrastructure updates",
+      "matchPackagePatterns": ["traefik", "cloudflared", "sealed-secrets", "tailscale"],
+      "groupName": "infrastructure"
+    },
+    {
+      "description": "Critical services - manual merge only",
+      "matchPackagePatterns": ["adguard"],
+      "automerge": false,
+      "labels": ["critical", "dependencies"]
+    },
+    {
+      "description": "Group CI/CD updates",
+      "matchPackagePatterns": ["actions-runner", "arc"],
+      "groupName": "cicd"
+    },
+    {
+      "description": "Immich - manual merge only (breaking changes frequent)",
+      "matchPackagePatterns": ["immich"],
+      "automerge": false,
+      "labels": ["critical", "dependencies"]
+    },
+    {
+      "description": "Group monitoring updates",
+      "matchPackagePatterns": ["prometheus", "grafana", "loki", "promtail", "alertmanager", "restic"],
+      "groupName": "monitoring"
+    }
+  ],
+  "labels": ["dependencies"],
+  "schedule": ["before 6am on Monday"]
+}

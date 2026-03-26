@@ -1,0 +1,28 @@
+# Secrets
+.env.secrets
+*.secret
+
+# env
+.env*
+
+# Backups
+backups/
+
+# Editor
+*.save
+*.swp
+*~
+.DS_Store
+
+# Data files (runtime generated)
+adguard/work/
+homepage/config/logs/
+
+# K8s secrets (plain text - SealedSecret만 커밋)
+**/secret.yaml
+**/secret-*.yaml
+sealed-secrets-key-backup.yaml
+
+# Tailscale OAuth
+# k8s/base/tailscale-operator/values.yaml 내 oauth 정보는
+# 반드시 SealedSecret으로 대체할 것
