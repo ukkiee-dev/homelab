@@ -38,9 +38,9 @@ prometheus:
 grafana:
   adminPassword: ""  # Secret으로 관리
   admin:
-    existingSecret: grafana-admin
-    userKey: admin-user
-    passwordKey: admin-password
+    existingSecret: infisical-managed-monitoring
+    userKey: GRAFANA_ADMIN_USERNAME
+    passwordKey: GRAFANA_ADMIN_PASSWORD
   persistence:
     enabled: true
     size: 2Gi
