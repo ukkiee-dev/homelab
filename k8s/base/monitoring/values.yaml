@@ -1,0 +1,135 @@
+# kube-prometheus-stack Helm values
+# K3s + OrbStack 호환 설정
+
+# --- K3s 호환: 존재하지 않는 컴포넌트 비활성화 ---
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+
+# --- Prometheus ---
+prometheus:
+  prometheusSpec:
+    retention: 30d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    # Immich namespace도 scrape
+    podMonitorNamespaceSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    ruleNamespaceSelector: {}
+
+# --- Grafana ---
+grafana:
+  adminPassword: ""  # Secret으로 관리
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  persistence:
+    enabled: true
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Loki 데이터소스 자동 추가
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.monitoring:3100
+      isDefault: false
+
+# --- AlertManager ---
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: telegram
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - match:
+            severity: critical
+          receiver: telegram
+          repeat_interval: 1h
+    receivers:
+      - name: telegram
+        telegram_configs:
+          - bot_token_file: /etc/alertmanager/secrets/telegram-bot-token/telegram-bot-token
+            chat_id: 8001733025
+            parse_mode: HTML
+            message: |
+              {{ range .Alerts }}
+              <b>{{ .Labels.alertname }}</b>
+              {{ .Annotations.summary }}
+              Severity: {{ .Labels.severity }}
+              {{ end }}
+  alertmanagerSpec:
+    secrets:
+      - telegram-bot-token
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+# --- 기본 알림 규칙 ---
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false          # K3s에는 etcd가 없음
+    kubeScheduler: false
+    kubeProxy: false
+    kubeControllerManager: false
+
+# --- 추가 알림 규칙 (Immich) ---
+additionalPrometheusRulesMap:
+  immich-rules:
+    groups:
+      - name: immich
+        rules:
+          - alert: ImmichStorageHigh
+            expr: |
+              kubelet_volume_stats_used_bytes{persistentvolumeclaim="immich-media", namespace="immich"}
+              /
+              kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="immich-media", namespace="immich"}
+              > 0.85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Immich 미디어 스토리지 85% 초과"
+          - alert: ImmichCrashLoop
+            expr: |
+              increase(kube_pod_container_status_restarts_total{
+                namespace="immich", container="server"
+              }[10m]) > 3
+            labels:
+              severity: critical
+            annotations:
+              summary: "Immich 서버 반복 재시작 — SSD 분리 가능성"
