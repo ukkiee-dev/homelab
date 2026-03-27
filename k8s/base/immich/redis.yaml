@@ -21,9 +21,21 @@ spec:
         app.kubernetes.io/component: cache
         app.kubernetes.io/part-of: homelab
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: redis
-          image: redis:7-alpine
+          image: redis:7.4.8-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: tcp
               containerPort: 6379

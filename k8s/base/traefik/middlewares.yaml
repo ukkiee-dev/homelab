@@ -98,7 +98,7 @@ spec:
     crowdsec-bouncer:
       crowdsecLapiScheme: http
       crowdsecLapiHost: crowdsec-service.crowdsec:8080
-      crowdsecLapiKey: 45quR62Xp91t3XHh+O/Oq8XaIorc7QwOcT5gNNd7FxI
+      crowdsecLapiKeyFile: /etc/crowdsec/lapi-key
       clientTrustedIPs:
         - "100.64.0.0/10"
         - "192.168.192.0/20"

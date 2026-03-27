@@ -29,5 +29,11 @@ resources:
   - ../../base/argocd
   - ../../base/argo-rollouts
 
+  # Secret Management
+  - ../../base/infisical
+
+  # Security
+  - ../../base/crowdsec
+
   # Network Policies
   - ../../base/network-policies
