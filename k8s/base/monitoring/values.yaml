@@ -144,3 +144,41 @@ additionalPrometheusRulesMap:
               severity: critical
             annotations:
               summary: "Immich 서버 반복 재시작 — SSD 분리 가능성"
+  k3s-system-rules:
+    groups:
+      - name: k3s-system
+        rules:
+          - alert: K3sKubeletMemoryHigh
+            expr: process_resident_memory_bytes{job="kubelet"} / 1024 / 1024 > 800
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "kubelet 메모리 {{ $value | printf \"%.0f\" }}Mi — K8s가 인지 못하는 시스템 메모리"
+              description: "kubelet RSS가 800Mi 초과. K8s 리소스 관리 밖이므로 노드 메모리 압박 유발."
+          - alert: K3sApiserverMemoryHigh
+            expr: process_resident_memory_bytes{job="apiserver"} / 1024 / 1024 > 800
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "apiserver 메모리 {{ $value | printf \"%.0f\" }}Mi — K8s가 인지 못하는 시스템 메모리"
+              description: "kube-apiserver RSS가 800Mi 초과. 잦은 API 호출(ArgoCD sync 등)이 원인일 수 있음."
+          - alert: K3sSystemMemoryOverhead
+            expr: |
+              (process_resident_memory_bytes{job="kubelet"} + on() process_resident_memory_bytes{job="apiserver"})
+              / 1024 / 1024 > 1500
+            for: 10m
+            labels:
+              severity: critical
+            annotations:
+              summary: "K3s 시스템 프로세스 합산 {{ $value | printf \"%.0f\" }}Mi — 노드 swap 압박 경고"
+              description: "kubelet + apiserver 합산 1.5Gi 초과. Pod 메모리와 별개로 노드 물리 메모리를 소모."
+          - alert: NodeSwapUsageHigh
+            expr: node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes > 1073741824
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Swap 사용 {{ $value | humanize }} — 물리 메모리 부족"
+              description: "Swap 1Gi 초과 사용 중. major page fault 원인."
