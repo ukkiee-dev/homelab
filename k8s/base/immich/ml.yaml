@@ -32,11 +32,11 @@ spec:
               mountPath: /cache
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 200m
+              memory: 256Mi
             limits:
-              cpu: "4"
-              memory: 4Gi
+              cpu: "2"
+              memory: 1280Mi
           startupProbe:
             httpGet:
               path: /ping

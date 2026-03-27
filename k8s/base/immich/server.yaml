@@ -48,11 +48,11 @@ spec:
               mountPath: /usr/src/app/upload
           resources:
             requests:
-              cpu: 250m
-              memory: 512Mi
+              cpu: 200m
+              memory: 256Mi
             limits:
-              cpu: "2"
-              memory: 2Gi
+              cpu: "1"
+              memory: 1Gi
           startupProbe:
             httpGet:
               path: /api/server/ping
