@@ -2,6 +2,7 @@
 # helm repo add argo https://argoproj.github.io/argo-helm
 
 controller:
+  replicas: 1
   resources:
     requests:
       cpu: 50m
@@ -11,11 +12,4 @@ controller:
       memory: 128Mi
 
 dashboard:
-  enabled: true
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
+  enabled: false
