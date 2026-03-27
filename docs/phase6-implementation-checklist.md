@@ -10,21 +10,21 @@
 - [ ] External DNS Helm 배포
 - [ ] Cloudflare DNS 자동 관리 테스트
 
-## Phase 6-B: Cloudflare 보안 ⬜
+## Phase 6-B: Cloudflare 보안 🔄
 
-- [ ] WAF Managed Rules 활성화 (OWASP)
-- [ ] Bot Fight Mode 활성화
-- [ ] Rate Limiting Rule 설정
-- [ ] Traefik Rate Limit Middleware 추가
+- [ ] WAF Managed Rules 활성화 (OWASP) — Cloudflare Dashboard에서 설정
+- [ ] Bot Fight Mode 활성화 — Cloudflare Dashboard에서 설정
+- [ ] Rate Limiting Rule 설정 — Cloudflare Dashboard에서 설정
+- [x] Traefik Rate Limit Middleware 추가 (50 req/min per CF-Connecting-IP)
 
-## Phase 6-C: CrowdSec + Traefik Bouncer ⬜
+## Phase 6-C: CrowdSec + Traefik Bouncer ✅
 
-- [ ] CrowdSec Helm 배포 (Agent + LAPI)
-- [ ] Traefik 액세스 로그 활성화
-- [ ] Traefik Bouncer Plugin 설정
-- [ ] CrowdSec CAPI 등록
-- [ ] NetworkPolicy
-- [ ] 공개 IngressRoute에 bouncer middleware 추가
+- [x] CrowdSec Helm 배포 (Agent + LAPI)
+- [x] Traefik 액세스 로그 활성화 (JSON format)
+- [x] Traefik Bouncer Plugin 설정 (crowdsec-bouncer middleware)
+- [x] photos.ukkiee.dev에 bouncer middleware 적용
+- [ ] CrowdSec CAPI 등록 (커뮤니티 blocklist)
+- [ ] NetworkPolicy (후속)
 
 ## Phase 6-D: Cloudflare Bouncer (선택) ⬜
 

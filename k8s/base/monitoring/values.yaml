@@ -28,7 +28,7 @@ prometheus:
         memory: 512Mi
       limits:
         cpu: "1"
-        memory: 1Gi
+        memory: 1536Mi
     # Immich namespace도 scrape
     podMonitorNamespaceSelector: {}
     serviceMonitorNamespaceSelector: {}
