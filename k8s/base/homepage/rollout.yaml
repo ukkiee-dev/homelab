@@ -21,6 +21,7 @@ spec:
       autoPromotionEnabled: true
       autoPromotionSeconds: 30
       scaleDownDelaySeconds: 30
+      scaleDownDelayRevisionLimit: 0
   template:
     metadata:
       labels:
