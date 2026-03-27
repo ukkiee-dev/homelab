@@ -1,10 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: argocd
-
 resources:
-  - namespace.yaml
+  - infisical-secrets-sync.yaml
   - ingressroute.yaml
-  - image-updater.yaml
   - network-policy.yaml

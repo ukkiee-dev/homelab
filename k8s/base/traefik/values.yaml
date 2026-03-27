@@ -15,6 +15,13 @@ deployment:
       volumeMounts:
         - name: letsencrypt
           mountPath: /letsencrypt
+  additionalVolumes:
+    - name: crowdsec-lapi-key
+      secret:
+        secretName: infisical-managed-traefik
+        items:
+          - key: CROWDSEC_LAPI_KEY
+            path: lapi-key
 
 image:
   tag: "v3.3"
@@ -96,6 +103,11 @@ resources:
   limits:
     cpu: 300m
     memory: 256Mi
+
+additionalVolumeMounts:
+  - name: crowdsec-lapi-key
+    mountPath: /etc/crowdsec
+    readOnly: true
 
 service:
   spec:

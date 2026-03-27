@@ -6,4 +6,3 @@ namespace: apps
 resources:
   - rollout.yaml
   - ingressroute.yaml
-  - image-updater.yaml
