@@ -1,4 +1,4 @@
-.PHONY: help install-tools apply diff sync status argocd-password pods logs events seal-secret bootstrap-secrets migrate backup restart port-forward top health validate pvc
+.PHONY: help install-tools apply sync status argocd-password pods logs events seal-secret backup restart port-forward top health pvc
 
 help: ## 명령어 목록
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -10,14 +10,9 @@ install-tools: ## macOS CLI 도구 설치 (kubectl, helm, k9s 등)
 
 # --- 배포 ---
 
-apply: ## 모든 매니페스트 적용 (kustomize)
-	kubectl apply -k k8s/overlays/production
-
-diff: ## 현재 클러스터와 매니페스트 차이 확인
-	kubectl diff -k k8s/overlays/production || true
-
-validate: ## 매니페스트 서버 사이드 검증 (dry-run)
-	kubectl apply -k k8s/overlays/production --dry-run=server
+apply: ## ArgoCD가 관리 — 수동 적용 불필요 (kubectl apply -f argocd/root.yaml)
+	@echo "ArgoCD GitOps로 관리됩니다. 수동 적용이 필요하면:"
+	@echo "  kubectl apply -f argocd/root.yaml"
 
 # --- ArgoCD ---
 
@@ -55,16 +50,8 @@ restart: ## 특정 워크로드 재시작 (사용: make restart NAME=<deploy/nam
 
 # --- 시크릿 ---
 
-seal-secret: ## Sealed Secret 생성 (사용: make seal-secret ARGS="traefik traefik-system kv-api-token=xxx")
-	./scripts/seal-secret.sh $(ARGS)
-
-bootstrap-secrets: ## 부트스트랩 시크릿 생성 (클러스터 초기 구성 시 필수)
-	./scripts/bootstrap-secrets.sh
-
-# --- 데이터 ---
-
-migrate: ## 서비스 데이터 마이그레이션 (사용: make migrate SVC=uptime-kuma)
-	./scripts/migrate-data.sh $(SVC)
+seal-secret: ## Sealed Secret 생성 (사용: make seal-secret NS=apps NAME=my-secret KEY=value)
+	@echo "kubectl create secret generic $(NAME) -n $(NS) --from-literal=$(KEY) --dry-run=client -o yaml | kubeseal --format yaml"
 
 backup: ## PVC 데이터 백업
 	./backup.sh

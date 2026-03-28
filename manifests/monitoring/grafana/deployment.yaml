@@ -34,12 +34,12 @@ spec:
             - name: GF_SECURITY_ADMIN_USER
               valueFrom:
                 secretKeyRef:
-                  name: infisical-managed-monitoring
+                  name: monitoring-secrets
                   key: GRAFANA_ADMIN_USERNAME
             - name: GF_SECURITY_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: infisical-managed-monitoring
+                  name: monitoring-secrets
                   key: GRAFANA_ADMIN_PASSWORD
             - name: GF_INSTALL_PLUGINS
               value: victoriametrics-logs-datasource

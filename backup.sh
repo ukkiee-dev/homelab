@@ -48,7 +48,6 @@ echo "=== K8s PVC 백업 시작 (${TIMESTAMP}) ==="
 backup_pvc "apps" "uptime-kuma" "/app/data" "uptime-kuma"
 backup_pvc "apps" "adguard" "/opt/adguardhome/conf" "adguard-conf"
 backup_pvc "apps" "adguard" "/opt/adguardhome/work" "adguard-work"
-backup_pvc "apps" "portainer" "/data" "portainer"
 backup_pvc "traefik-system" "traefik" "/letsencrypt" "traefik-acme"
 
 # --- Immich 상태 확인 (데이터는 외장 SSD + R2 Restic으로 별도 백업) ---
