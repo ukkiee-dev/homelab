@@ -15,13 +15,6 @@ deployment:
       volumeMounts:
         - name: letsencrypt
           mountPath: /letsencrypt
-  additionalVolumes:
-    - name: crowdsec-lapi-key
-      secret:
-        secretName: infisical-managed-traefik
-        items:
-          - key: CROWDSEC_LAPI_KEY
-            path: lapi-key
 
 image:
   tag: "v3.3"
@@ -43,11 +36,6 @@ ports:
     exposedPort: 443
     protocol: TCP
 
-experimental:
-  plugins:
-    crowdsec-bouncer:
-      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      version: v1.4.2
 
 additionalArguments:
   - "--certificatesresolvers.cloudflare.acme.email=admin@ukkiee.dev"
@@ -104,10 +92,6 @@ resources:
     cpu: 300m
     memory: 256Mi
 
-additionalVolumeMounts:
-  - name: crowdsec-lapi-key
-    mountPath: /etc/crowdsec
-    readOnly: true
 
 service:
   spec:

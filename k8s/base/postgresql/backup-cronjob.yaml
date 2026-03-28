@@ -29,8 +29,6 @@ spec:
                   echo "=== pg_dump started at $(date) ==="
                   # api database
                   PGPASSWORD="$PG_PASSWORD" pg_dump -h postgresql -U postgres -Fc api > /backups/api-$(date +%Y%m%d).sql
-                  # infisical database
-                  PGPASSWORD="$PG_PASSWORD" pg_dump -h postgresql -U postgres -Fc infisical > /backups/infisical-$(date +%Y%m%d).sql
                   # 7일 이전 삭제
                   find /backups -name "*.sql" -mtime +7 -delete
                   echo "=== pg_dump completed ==="

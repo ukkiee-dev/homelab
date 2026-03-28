@@ -47,7 +47,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "2"
-              memory: 1280Mi
+              memory: 768Mi
           startupProbe:
             httpGet:
               path: /ping

@@ -27,6 +27,15 @@ spec:
         fsGroup: 999
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        - name: fix-permissions
+          image: busybox:1.37
+          command: ["sh", "-c", "chown -R 999:999 /var/lib/postgresql/data"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
       containers:
         - name: postgres
           image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
@@ -60,7 +69,7 @@ spec:
               memory: 128Mi
             limits:
               cpu: 500m
-              memory: 768Mi
+              memory: 512Mi
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", "postgres", "-d", "immich"]

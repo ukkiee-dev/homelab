@@ -23,7 +23,3 @@ spec:
           port: 3000   # homepage
         - protocol: TCP
           port: 3001   # uptime-kuma
-        - protocol: TCP
-          port: 8080   # dozzle
-        - protocol: TCP
-          port: 9000   # portainer

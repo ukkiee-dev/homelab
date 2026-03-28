@@ -4,7 +4,4 @@ kind: Kustomization
 namespace: monitoring
 
 resources:
-  - namespace.yaml
-  - ingressroute.yaml
-  - podmonitors.yaml
-  - network-policy.yaml
+  - sealed-secret.yaml

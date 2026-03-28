@@ -19,21 +19,18 @@ resources:
   - ../../base/homepage
   - ../../base/uptime-kuma
   - ../../base/adguard
-  - ../../base/portainer
-  - ../../base/dozzle
   - ../../base/immich
   - ../../base/api-server
 
   # CI/CD
   - ../../base/arc-runners
   - ../../base/argocd
-  - ../../base/argo-rollouts
 
-  # Secret Management
-  - ../../base/infisical
-
-  # Security
-  - ../../base/crowdsec
+  # Monitoring
+  - ../../base/victoria-metrics
+  - ../../base/victoria-logs
+  - ../../base/alloy
+  - ../../base/grafana
 
   # Network Policies
   - ../../base/network-policies
