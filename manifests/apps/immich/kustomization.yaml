@@ -14,3 +14,4 @@ resources:
   - ingressroute.yaml
   - network-policy.yaml
   - backup-cronjob.yaml
+  - sealed-secret.yaml
