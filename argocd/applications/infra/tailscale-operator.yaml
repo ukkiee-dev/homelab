@@ -26,7 +26,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: tailscale-system
-  # NOTE: 자동 sync 비활성화 — operator-oauth Secret 생성 후 automated 블록 복원할 것
   syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
     syncOptions:
       - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -30,7 +30,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: server
-          image: ghcr.io/immich-app/immich-server:release
+          image: ghcr.io/immich-app/immich-server:v2.6.3
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

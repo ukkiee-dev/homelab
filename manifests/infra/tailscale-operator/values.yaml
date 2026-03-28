@@ -1,16 +1,21 @@
 # Tailscale Operator Helm Values
-# helm repo add tailscale https://pkgs.tailscale.com/helmcharts
-# helm install tailscale-operator tailscale/tailscale-operator \
-#   -n tailscale-system -f values.yaml
+# Docs: https://tailscale.com/kb/1236/kubernetes-operator
 #
 # Prerequisites: Create OAuth client in Tailscale Admin
-#   - Tags: tag:k8s
-#   - Scopes: devices (write), auth keys (write)
-#   Docs: https://tailscale.com/kb/1236/kubernetes-operator
+#   - Tag: tag:k8s-operator
+#   - Scopes: Devices Core (write), Auth Keys (write)
+#   - Optional: Services (write) — HA ingress/ProxyGroup 사용 시
+#
+# ACL Policy에 tagOwners 추가 필요:
+#   "tag:k8s-operator": []
+#   "tag:k8s": ["tag:k8s-operator"]
+#
+# OAuth credentials는 SealedSecret(operator-oauth)으로 관리
+# values.yaml에는 비워둘 것
 
 oauth:
-  clientId: ""      # Tailscale OAuth Client ID
-  clientSecret: ""  # Tailscale OAuth Client Secret
+  clientId: ""
+  clientSecret: ""
 
 operatorConfig:
   hostname: homelab-operator
