@@ -6,6 +6,10 @@ config:
       credentials: pullsecret:argocd/ghcr-pull-secret
       default: true
 
+# 이미지 체크 주기: 기본 2분 → 10분 (API 부하 및 메모리 진동 감소)
+extraArgs:
+  - --interval=10m
+
 resources:
   requests:
     cpu: 50m
