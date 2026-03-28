@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: api-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: api-server
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: api=ghcr.io/ukkiee-dev/api-server
+    argocd-image-updater.argoproj.io/api.update-strategy: latest
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ukkiee-dev/homelab.git
+    targetRevision: main
+    path: manifests/apps/api-server
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true

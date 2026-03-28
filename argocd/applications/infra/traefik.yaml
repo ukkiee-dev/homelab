@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  project: default
+  sources:
+    # Helm chart
+    - chart: traefik
+      repoURL: https://traefik.github.io/charts
+      targetRevision: "34.*"
+      helm:
+        valueFiles:
+          - $values/manifests/infra/traefik/values.yaml
+    # Kustomize (middlewares, ingressroutes)
+    - repoURL: https://github.com/ukkiee-dev/homelab.git
+      targetRevision: main
+      path: manifests/infra/traefik
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traefik-system
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
