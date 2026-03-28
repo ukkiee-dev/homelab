@@ -35,7 +35,7 @@ spec:
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: infisical-managed-immich
+                      name: immich-secrets
                       key: IMMICH_DB_PASSWORD
               volumeMounts:
                 - name: backups
@@ -87,27 +87,27 @@ spec:
                 - name: AWS_ACCESS_KEY_ID
                   valueFrom:
                     secretKeyRef:
-                      name: infisical-managed-immich
+                      name: immich-secrets
                       key: R2_ACCESS_KEY_ID
                 - name: AWS_SECRET_ACCESS_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: infisical-managed-immich
+                      name: immich-secrets
                       key: R2_SECRET_ACCESS_KEY
                 - name: RESTIC_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: infisical-managed-immich
+                      name: immich-secrets
                       key: RESTIC_PASSWORD
                 - name: R2_ENDPOINT
                   valueFrom:
                     secretKeyRef:
-                      name: infisical-managed-immich
+                      name: immich-secrets
                       key: R2_ENDPOINT
                 - name: R2_BUCKET
                   valueFrom:
                     secretKeyRef:
-                      name: infisical-managed-immich
+                      name: immich-secrets
                       key: R2_BUCKET
               volumeMounts:
                 - name: media

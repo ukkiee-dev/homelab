@@ -43,7 +43,7 @@ spec:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: infisical-managed-immich
+                  name: immich-secrets
                   key: IMMICH_DB_PASSWORD
             - name: DB_DATABASE_NAME
               value: immich

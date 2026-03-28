@@ -11,6 +11,9 @@ backups/
 *~
 .DS_Store
 
+# Runner work directory (ARC/local runner artifact)
+runner/
+
 # K8s secrets (plain text - SealedSecret만 커밋)
 **/secret.yaml
 **/secret-*.yaml

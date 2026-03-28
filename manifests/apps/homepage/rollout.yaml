@@ -48,17 +48,17 @@ spec:
             - name: HOMEPAGE_VAR_ADGUARD_USER
               valueFrom:
                 secretKeyRef:
-                  name: infisical-managed-apps
+                  name: apps-secrets
                   key: ADGUARD_USERNAME
             - name: HOMEPAGE_VAR_ADGUARD_PASS
               valueFrom:
                 secretKeyRef:
-                  name: infisical-managed-apps
+                  name: apps-secrets
                   key: ADGUARD_PASSWORD
             - name: HOMEPAGE_VAR_IMMICH_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: infisical-managed-apps
+                  name: apps-secrets
                   key: IMMICH_API_KEY
           volumeMounts:
             - name: config
