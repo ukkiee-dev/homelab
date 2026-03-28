@@ -1,25 +1,25 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: infisical
-  namespace: infisical
+  name: grafana
+  namespace: monitoring
   labels:
-    app.kubernetes.io/name: infisical
-    app.kubernetes.io/component: secrets
+    app.kubernetes.io/name: grafana
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
   entryPoints:
-    - web
     - websecure
   routes:
-    - match: Host(`secrets.ukkiee.dev`)
+    - match: Host(`grafana.ukkiee.dev`)
       kind: Rule
       middlewares:
-        - name: tailscale-only
-          namespace: traefik-system
         - name: security-headers
           namespace: traefik-system
+        - name: gzip
+          namespace: traefik-system
       services:
-        - name: infisical-infisical-standalone-infisical
-          port: 8080
+        - name: grafana
+          port: 3000
+  tls:
+    certResolver: cloudflare

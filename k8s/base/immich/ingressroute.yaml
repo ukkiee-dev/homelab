@@ -19,8 +19,6 @@ spec:
           namespace: traefik-system
         - name: rate-limit
           namespace: traefik-system
-        - name: crowdsec-bouncer
-          namespace: traefik-system
       services:
         - name: immich-server
           port: 2283

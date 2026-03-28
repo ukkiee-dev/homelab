@@ -14,9 +14,7 @@ spec:
       - key: app.kubernetes.io/name
         operator: In
         values:
-          - dozzle
           - homepage
-          - portainer
   policyTypes:
     - Egress
   egress:

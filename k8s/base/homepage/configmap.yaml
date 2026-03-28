@@ -78,14 +78,9 @@ data:
             icon: sh-argo-cd.png
             href: https://argo.ukkiee.dev
             description: GitOps
-        - Infisical:
+        - Sealed Secrets:
             icon: mdi-shield-lock
-            href: https://secrets.ukkiee.dev
             description: Secret Management
-        - Portainer:
-            icon: portainer.png
-            href: https://portainer.ukkiee.dev
-            description: Container Management
         - Cloudflare Tunnel:
             icon: cloudflare.png
             description: External Access
@@ -94,13 +89,12 @@ data:
             icon: grafana.png
             href: https://grafana.ukkiee.dev
             description: Metrics & Logs
-        - Dozzle:
-            icon: dozzle.png
-            href: https://logs.ukkiee.dev
-            description: Log Viewer
-        - Prometheus:
-            icon: prometheus.png
+        - VictoriaMetrics:
+            icon: mdi-chart-line
             description: Metrics Collection
+        - VictoriaLogs:
+            icon: mdi-text-box-outline
+            description: Log Collection
 
   bookmarks.yaml: |
     - Developer:
