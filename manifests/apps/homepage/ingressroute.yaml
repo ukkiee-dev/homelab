@@ -25,16 +25,3 @@ spec:
       services:
         - name: homepage
           port: 3000
-    # Blue-Green preview (새 버전 미리 확인)
-    - match: Host(`preview-home.ukkiee.dev`)
-      kind: Rule
-      middlewares:
-        - name: tailscale-only
-          namespace: traefik-system
-        - name: security-headers
-          namespace: traefik-system
-        - name: gzip
-          namespace: traefik-system
-      services:
-        - name: homepage-preview
-          port: 3000

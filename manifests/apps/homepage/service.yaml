@@ -15,21 +15,3 @@ spec:
     - name: http
       port: 3000
       targetPort: http
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: homepage-preview
-  namespace: apps
-  labels:
-    app.kubernetes.io/name: homepage
-    app.kubernetes.io/component: web
-    app.kubernetes.io/part-of: homelab
-    app.kubernetes.io/managed-by: argocd
-spec:
-  selector:
-    app.kubernetes.io/name: homepage
-  ports:
-    - name: http
-      port: 3000
-      targetPort: http

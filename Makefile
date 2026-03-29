@@ -17,7 +17,7 @@ apply: ## ArgoCD가 관리 — 수동 적용 불필요 (kubectl apply -f argocd/
 # --- ArgoCD ---
 
 sync: ## ArgoCD 전체 앱 동기화
-	argocd app sync app-of-apps --prune
+	argocd app sync root --prune
 
 status: ## ArgoCD 앱 상태 확인
 	argocd app list
