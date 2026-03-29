@@ -166,6 +166,8 @@ runs:
                 fsGroup: 1000
                 seccompProfile:
                   type: RuntimeDefault
+              imagePullSecrets:
+                - name: ghcr-secret
               volumes:
                 - name: tmp
                   emptyDir: {}
