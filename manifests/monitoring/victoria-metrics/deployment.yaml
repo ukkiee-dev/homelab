@@ -9,6 +9,8 @@ metadata:
     app.kubernetes.io/managed-by: argocd
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: victoria-metrics
@@ -71,7 +73,8 @@ spec:
               readOnly: true
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: victoria-metrics-data
         - name: scrape-config
           configMap:
             name: victoria-metrics-config
