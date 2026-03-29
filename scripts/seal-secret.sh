@@ -129,13 +129,24 @@ cmd_set() {
 
     echo "SealedSecret 업데이트 완료: ${target_file#$REPO_ROOT/}"
     echo ""
-    echo -n "Git에 커밋하고 push할까요? (y/N): "
+    echo -n "Git에 커밋하고 push할까요? (y/n): "
     read -r answer
     if [[ "$answer" =~ ^[Yy]$ ]]; then
         git -C "$REPO_ROOT" add "$target_file"
         git -C "$REPO_ROOT" commit -m "feat: update ${key} in ${secret}"
         git -C "$REPO_ROOT" push
         echo "반영 완료!"
+
+        # Grafana 비밀번호 변경 시 DB에도 반영
+        if [[ "$secret" == "monitoring-secrets" && "$key" == "GRAFANA_ADMIN_PASSWORD" ]]; then
+            echo ""
+            echo "Grafana DB에 비밀번호를 동기화합니다..."
+            # ArgoCD sync 대기 후 파드 내 비밀번호 리셋
+            echo "ArgoCD sync 대기 중..."
+            sleep 30
+            NEW_PW=$(kubectl get secret monitoring-secrets -n monitoring -o jsonpath='{.data.GRAFANA_ADMIN_PASSWORD}' | base64 -d)
+            kubectl exec -n monitoring deploy/grafana -- grafana cli admin reset-admin-password "$NEW_PW" 2>&1 | tail -1
+        fi
     else
         echo "수동으로 반영하려면:"
         echo "  git add ${target_file#$REPO_ROOT/}"
