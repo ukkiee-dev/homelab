@@ -79,7 +79,7 @@ ArgoCD (App-of-Apps)
 |---------|--------|--------|-------------|
 | [Immich](https://github.com/immich-app/immich) | `photos.ukkiee.dev` | Public | Self-hosted photo/video library |
 | [Homepage](https://github.com/gethomepage/homepage) | `home.ukkiee.dev` | Tailscale | Service dashboard |
-| [AdGuard Home](https://github.com/AdguardTeam/AdGuardHome) | `dns.ukkiee.dev` | Tailscale | DNS ad blocker |
+| [AdGuard Home](https://github.com/AdguardTeam/AdGuardHome) | `adguard.ukkiee.dev` | Tailscale | DNS ad blocker |
 | [Uptime Kuma](https://github.com/louislam/uptime-kuma) | `status.ukkiee.dev` | Tailscale | Uptime monitoring |
 | API Server | `api.ukkiee.dev` | Tailscale | Custom API backend |
 

@@ -13,7 +13,7 @@ spec:
     - web
     - websecure
   routes:
-    - match: Host(`dns.ukkiee.dev`)
+    - match: Host(`adguard.ukkiee.dev`)
       kind: Rule
       middlewares:
         - name: tailscale-only

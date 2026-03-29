@@ -58,7 +58,7 @@ data:
               slug: default
         - AdGuard Home:
             icon: adguard-home.png
-            href: https://dns.ukkiee.dev
+            href: https://adguard.ukkiee.dev
             description: DNS Ad Blocker
             widget:
               type: adguard
