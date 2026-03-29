@@ -6,3 +6,5 @@ resources:
   - victoria-logs
   - alloy
   - grafana
+  - kube-state-metrics
+  - node-exporter

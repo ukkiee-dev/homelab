@@ -80,9 +80,9 @@ data:
       - job_name: kube-state-metrics
         static_configs:
           - targets:
-              - kube-prometheus-stack-kube-state-metrics.monitoring:8080
+              - kube-state-metrics.monitoring:8080
 
       - job_name: node-exporter
         static_configs:
           - targets:
-              - kube-prometheus-stack-prometheus-node-exporter.monitoring:9100
+              - node-exporter.monitoring:9100
