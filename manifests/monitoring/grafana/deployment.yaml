@@ -55,12 +55,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: telegram-secret
-                  key: bot-token
+                  key: BOT_TOKEN
             - name: TELEGRAM_CHAT_ID
               valueFrom:
                 secretKeyRef:
                   name: telegram-secret
-                  key: chat-id
+                  key: CHAT_ID
           resources:
             requests:
               cpu: 50m
