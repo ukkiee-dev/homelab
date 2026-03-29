@@ -9,6 +9,8 @@ metadata:
     app.kubernetes.io/managed-by: argocd
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: grafana
@@ -89,7 +91,8 @@ spec:
               readOnly: true
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: grafana-data
         - name: datasources
           configMap:
             name: grafana-datasources

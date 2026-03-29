@@ -9,6 +9,8 @@ metadata:
     app.kubernetes.io/managed-by: argocd
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: victoria-logs
@@ -64,4 +66,5 @@ spec:
               mountPath: /data
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: victoria-logs-data
