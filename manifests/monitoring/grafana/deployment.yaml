@@ -47,6 +47,18 @@ spec:
               value: "true"
             - name: GF_ALERTING_ENABLED
               value: "false"
+            - name: GF_SERVER_ROOT_URL
+              value: "https://grafana.ukkiee.dev"
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: telegram-secret
+                  key: bot-token
+            - name: TELEGRAM_CHAT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: telegram-secret
+                  key: chat-id
           resources:
             requests:
               cpu: 50m
@@ -72,9 +84,15 @@ spec:
             - name: datasources
               mountPath: /etc/grafana/provisioning/datasources
               readOnly: true
+            - name: alerting
+              mountPath: /etc/grafana/provisioning/alerting
+              readOnly: true
       volumes:
         - name: data
           emptyDir: {}
         - name: datasources
           configMap:
             name: grafana-datasources
+        - name: alerting
+          configMap:
+            name: grafana-alerting
