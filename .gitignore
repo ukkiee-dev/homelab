@@ -18,3 +18,10 @@ runner/
 **/secret.yaml
 **/secret-*.yaml
 sealed-secrets-key-backup.yaml
+
+# Terraform
+**/.terraform/
+*.tfplan
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
