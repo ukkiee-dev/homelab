@@ -1,0 +1,99 @@
+name: Update Image Tag
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        type: string
+        required: true
+      image-tag:
+        type: string
+        required: true
+    secrets:
+      APP_ID:
+        required: true
+      APP_PRIVATE_KEY:
+        required: true
+      TELEGRAM_BOT_TOKEN:
+        required: false
+      TELEGRAM_CHAT_ID:
+        required: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-manifest-update
+      cancel-in-progress: false
+
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ukkiee-dev
+          repositories: homelab
+
+      - name: Checkout homelab
+        uses: actions/checkout@v4
+        with:
+          repository: ukkiee-dev/homelab
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Install yq
+        uses: mikefarah/yq@v4
+
+      - name: Update image tag
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+          IMAGE_TAG: ${{ inputs.image-tag }}
+        run: |
+          set -euo pipefail
+          FILE="manifests/apps/${APP_NAME}/deployment.yaml"
+
+          if [ ! -f "$FILE" ]; then
+            echo "❌ 매니페스트 없음: $FILE"
+            exit 1
+          fi
+
+          yq eval -i \
+            ".spec.template.spec.containers[0].image = \"ghcr.io/ukkiee-dev/${APP_NAME}:${IMAGE_TAG}\"" \
+            "$FILE"
+
+          git config user.email "deploy-bot@users.noreply.github.com"
+          git config user.name "deploy-bot[bot]"
+
+          if git diff --quiet; then
+            echo "⏭️  이미지 변경 없음"
+            exit 0
+          fi
+
+          git commit -am "chore: update ${APP_NAME} → ${IMAGE_TAG}"
+
+          PUSHED=false
+          for i in 1 2 3; do
+            git rebase --abort 2>/dev/null || true
+            git pull --rebase origin main && git push && PUSHED=true && break || {
+              echo "⚠️  push 실패 ($i/3), 재시도..."
+              sleep $((i * 5))
+            }
+          done
+
+          if [ "$PUSHED" != "true" ]; then
+            echo "❌ 3회 retry 후에도 push 실패"
+            exit 1
+          fi
+
+      - name: Notify failure (Telegram)
+        if: failure()
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d chat_id="${TG_CHAT}" \
+            -d text="❌ 이미지 태그 갱신 실패: ${APP_NAME}%0A${RUN_URL}"

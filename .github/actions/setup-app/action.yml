@@ -1,0 +1,368 @@
+name: Setup App in Homelab
+description: Terraform(DNS+Tunnel) → 매니페스트 생성 → git push 순서 보장
+
+inputs:
+  app-name:             { required: true }
+  type:                 { required: true }
+  port:                 { required: false, default: "0" }
+  subdomain:            { required: false, default: "" }
+  health:               { required: false }
+  app-token:            { required: true }
+  tf-cloudflare-token:  { required: true }
+  tf-zone-id:           { required: true }
+  tf-tunnel-id:         { required: true }
+  tf-account-id:        { required: true }
+  r2-access-key-id:     { required: true }
+  r2-secret-access-key: { required: true }
+  domain:               { required: false, default: "ukkiee.dev" }
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout homelab
+      uses: actions/checkout@v4
+      with:
+        repository: ukkiee-dev/homelab
+        token: ${{ inputs.app-token }}
+        path: _homelab
+
+    # ── Step 1: apps.json + Terraform (worker는 스킵) ────────────
+    # worker 타입은 DNS/Tunnel이 불필요하므로 apps.json 수정과 terraform을 건너뜀
+    - name: Update apps.json & Terraform
+      if: ${{ inputs.type != 'worker' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        APP="${{ inputs.app-name }}"
+        SUBDOMAIN="${{ inputs.subdomain }}"
+        APPS_JSON="_homelab/terraform/apps.json"
+
+        EXISTS=$(jq --arg name "$APP" 'has($name)' "$APPS_JSON")
+        if [ "$EXISTS" = "true" ]; then
+          echo "⏭️  apps.json: $APP 이미 존재, 스킵"
+        else
+          jq --arg name "$APP" --arg sub "$SUBDOMAIN" \
+            '. + {($name): {subdomain: $sub}}' \
+            "$APPS_JSON" > /tmp/apps.json
+          jq empty /tmp/apps.json
+          mv /tmp/apps.json "$APPS_JSON"
+          echo "✅ apps.json: $APP ($SUBDOMAIN) 추가됨"
+        fi
+
+    - name: Setup Terraform
+      if: ${{ inputs.type != 'worker' }}
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.7.0"
+
+    - name: Terraform Init
+      if: ${{ inputs.type != 'worker' }}
+      shell: bash
+      working-directory: _homelab/terraform
+      run: |
+        terraform init \
+          -backend-config="endpoint=https://${{ inputs.tf-account-id }}.r2.cloudflarestorage.com" \
+          -backend-config="access_key=${{ inputs.r2-access-key-id }}" \
+          -backend-config="secret_key=${{ inputs.r2-secret-access-key }}"
+
+    - name: Terraform Plan
+      if: ${{ inputs.type != 'worker' }}
+      shell: bash
+      working-directory: _homelab/terraform
+      run: terraform plan -out=tfplan
+      env:
+        TF_VAR_cloudflare_api_token: ${{ inputs.tf-cloudflare-token }}
+        TF_VAR_zone_id:              ${{ inputs.tf-zone-id }}
+        TF_VAR_tunnel_id:            ${{ inputs.tf-tunnel-id }}
+        TF_VAR_account_id:           ${{ inputs.tf-account-id }}
+        TF_VAR_domain:               ${{ inputs.domain }}
+
+    - name: Terraform Apply
+      if: ${{ inputs.type != 'worker' }}
+      shell: bash
+      working-directory: _homelab/terraform
+      run: terraform apply tfplan
+      env:
+        TF_VAR_cloudflare_api_token: ${{ inputs.tf-cloudflare-token }}
+        TF_VAR_zone_id:              ${{ inputs.tf-zone-id }}
+        TF_VAR_tunnel_id:            ${{ inputs.tf-tunnel-id }}
+        TF_VAR_account_id:           ${{ inputs.tf-account-id }}
+        TF_VAR_domain:               ${{ inputs.domain }}
+
+    # ── Step 3: k8s 매니페스트 생성 ──────────────────────────────
+    - name: Create manifests
+      shell: bash
+      run: |
+        set -euo pipefail
+        APP="${{ inputs.app-name }}"
+        TYPE="${{ inputs.type }}"
+        PORT="${{ inputs.port }}"
+        SUBDOMAIN="${{ inputs.subdomain }}"
+        DOMAIN="${{ inputs.domain }}"
+
+        HEALTH_PATH="${{ inputs.health }}"
+
+        case "$TYPE" in
+          static)
+            MEMORY_REQUEST="64Mi"
+            MEMORY_LIMIT="128Mi"
+            CPU_REQUEST="50m"
+            CPU_LIMIT="100m"
+            [ -z "$HEALTH_PATH" ] && HEALTH_PATH="/"
+            ;;
+          web)
+            MEMORY_REQUEST="128Mi"
+            MEMORY_LIMIT="256Mi"
+            CPU_REQUEST="100m"
+            CPU_LIMIT="200m"
+            [ -z "$HEALTH_PATH" ] && HEALTH_PATH="/health"
+            ;;
+          worker)
+            MEMORY_REQUEST="128Mi"
+            MEMORY_LIMIT="256Mi"
+            CPU_REQUEST="100m"
+            CPU_LIMIT="200m"
+            ;;
+          *)
+            echo "❌ Unknown type: $TYPE (static|web|worker)"
+            exit 1
+            ;;
+        esac
+
+        mkdir -p _homelab/manifests/apps/$APP
+
+        cat > _homelab/manifests/apps/$APP/deployment.yaml << EOF
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: $APP
+          namespace: $APP
+          labels:
+            app.kubernetes.io/name: $APP
+            app.kubernetes.io/version: latest
+            app.kubernetes.io/component: $TYPE
+            app.kubernetes.io/managed-by: argocd
+        spec:
+          revisionHistoryLimit: 3
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: $APP
+          strategy:
+            type: RollingUpdate
+            rollingUpdate:
+              maxUnavailable: 0
+              maxSurge: 1
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/name: $APP
+                app.kubernetes.io/version: latest
+            spec:
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                runAsGroup: 1000
+                fsGroup: 1000
+                seccompProfile:
+                  type: RuntimeDefault
+              volumes:
+                - name: tmp
+                  emptyDir: {}
+              containers:
+                - name: $APP
+                  image: ghcr.io/ukkiee-dev/$APP:latest
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    readOnlyRootFilesystem: true
+                    capabilities:
+                      drop: ["ALL"]
+                  volumeMounts:
+                    - name: tmp
+                      mountPath: /tmp
+        EOF
+
+        # worker가 아니면 port 추가
+        if [ "$TYPE" != "worker" ]; then
+          cat >> _homelab/manifests/apps/$APP/deployment.yaml << EOF
+                  ports:
+                    - name: http
+                      containerPort: $PORT
+                      protocol: TCP
+        EOF
+        fi
+
+        # 공통: resources
+        cat >> _homelab/manifests/apps/$APP/deployment.yaml << EOF
+                  resources:
+                    requests:
+                      memory: "$MEMORY_REQUEST"
+                      cpu: "$CPU_REQUEST"
+                    limits:
+                      memory: "$MEMORY_LIMIT"
+                      cpu: "$CPU_LIMIT"
+        EOF
+
+        # worker가 아니면 probe 추가
+        if [ "$TYPE" != "worker" ]; then
+          cat >> _homelab/manifests/apps/$APP/deployment.yaml << EOF
+                  startupProbe:
+                    httpGet:
+                      path: $HEALTH_PATH
+                      port: http
+                    periodSeconds: 5
+                    failureThreshold: 12
+                  livenessProbe:
+                    httpGet:
+                      path: $HEALTH_PATH
+                      port: http
+                    periodSeconds: 20
+                    failureThreshold: 3
+                  readinessProbe:
+                    httpGet:
+                      path: $HEALTH_PATH
+                      port: http
+                    periodSeconds: 10
+                    failureThreshold: 3
+        EOF
+        fi
+
+        # worker: deployment만, static/web: 전체 리소스
+        if [ "$TYPE" = "worker" ]; then
+          cat > _homelab/manifests/apps/$APP/kustomization.yaml << EOF
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+          - deployment.yaml
+        EOF
+          echo "✅ manifests 생성 완료 (type=worker, Service/IngressRoute 없음)"
+        else
+          cat > _homelab/manifests/apps/$APP/service.yaml << EOF
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: $APP
+          namespace: $APP
+          labels:
+            app.kubernetes.io/name: $APP
+        spec:
+          selector:
+            app.kubernetes.io/name: $APP
+          ports:
+            - port: $PORT
+              targetPort: $PORT
+        EOF
+
+          cat > _homelab/manifests/apps/$APP/ingressroute.yaml << EOF
+        apiVersion: traefik.io/v1alpha1
+        kind: IngressRoute
+        metadata:
+          name: $APP
+          namespace: $APP
+          labels:
+            app.kubernetes.io/name: $APP
+        spec:
+          entryPoints:
+            - web
+            - websecure
+          routes:
+            - match: Host(\`$SUBDOMAIN.$DOMAIN\`)
+              kind: Rule
+              middlewares:
+                - name: security-headers
+                  namespace: traefik-system
+                - name: gzip
+                  namespace: traefik-system
+              services:
+                - name: $APP
+                  port: $PORT
+        EOF
+
+          cat > _homelab/manifests/apps/$APP/kustomization.yaml << EOF
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+          - deployment.yaml
+          - service.yaml
+          - ingressroute.yaml
+        EOF
+          echo "✅ manifests 생성 완료 (type=$TYPE)"
+        fi
+
+    - name: Create ArgoCD Application
+      shell: bash
+      run: |
+        set -euo pipefail
+        APP="${{ inputs.app-name }}"
+
+        cat > _homelab/argocd/applications/apps/$APP.yaml << EOF
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: $APP
+          namespace: argocd
+          annotations:
+            argocd.argoproj.io/sync-wave: "0"
+        spec:
+          project: default
+          source:
+            repoURL: https://github.com/ukkiee-dev/homelab.git
+            targetRevision: HEAD
+            path: manifests/apps/$APP
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: $APP
+          syncPolicy:
+            automated:
+              prune: true
+              selfHeal: true
+            syncOptions:
+              - CreateNamespace=true
+            retry:
+              limit: 3
+              backoff:
+                duration: 5s
+                factor: 2
+                maxDuration: 3m
+        EOF
+
+        echo "✅ ArgoCD Application 생성 완료"
+
+    # ── Step 4: git commit & push (terraform 완료 후) ─────────────
+    - name: Commit & Push
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd _homelab
+        git config user.email "deploy-bot@users.noreply.github.com"
+        git config user.name "deploy-bot[bot]"
+
+        git add manifests/ argocd/ terraform/apps.json
+
+        if git diff --staged --quiet; then
+          echo "⏭️  변경사항 없음, 커밋 스킵"
+          exit 0
+        fi
+
+        SUBDOMAIN="${{ inputs.subdomain }}"
+        if [ -n "$SUBDOMAIN" ]; then
+          git commit -m "feat: add ${{ inputs.app-name }} (${SUBDOMAIN}.${{ inputs.domain }})"
+        else
+          git commit -m "feat: add ${{ inputs.app-name }} (worker)"
+        fi
+
+        PUSHED=false
+        for i in 1 2 3; do
+          git rebase --abort 2>/dev/null || true
+          git pull --rebase origin main && git push && PUSHED=true && break || {
+            echo "⚠️  push 실패 ($i/3), ${i}*5초 후 재시도..."
+            sleep $((i * 5))
+          }
+        done
+
+        if [ "$PUSHED" != "true" ]; then
+          echo "❌ 3회 retry 후에도 push 실패"
+          exit 1
+        fi
+
+        echo "✅ homelab 레포 업데이트 완료"
