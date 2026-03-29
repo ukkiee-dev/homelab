@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-blog
+  namespace: test-blog
+  labels:
+    app.kubernetes.io/name: test-blog
+spec:
+  selector:
+    app.kubernetes.io/name: test-blog
+  ports:
+    - port: 3000
+      targetPort: 3000

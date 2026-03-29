@@ -1,0 +1,22 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: test-blog
+  namespace: test-blog
+  labels:
+    app.kubernetes.io/name: test-blog
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`blog.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+          namespace: traefik-system
+        - name: gzip
+          namespace: traefik-system
+      services:
+        - name: test-blog
+          port: 3000
