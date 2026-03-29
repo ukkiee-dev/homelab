@@ -21,7 +21,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: pgdump
-              image: bitnami/postgresql:18
+              image: bitnami/postgresql:latest
               command:
                 - sh
                 - -c
