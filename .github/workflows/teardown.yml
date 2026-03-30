@@ -113,6 +113,18 @@ jobs:
           rm -f "argocd/applications/apps/${APP_NAME}.yaml"
           echo "✅ 매니페스트 제거 완료"
 
+      # ── Step 3.5: GHCR 패키지 삭제 ──────────────────────────────
+      - name: Delete GHCR package
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          gh api "orgs/ukkiee-dev/packages/container/${APP_NAME}" -X DELETE \
+            && echo "✅ GHCR 패키지 삭제 완료" \
+            || echo "⏭️  GHCR 패키지 없음 또는 삭제 실패 (무시)"
+
+      # ── Step 4: git push ───────────────────────────────────────
       - name: Commit & Push
         env:
           APP_NAME: ${{ inputs.app-name }}
@@ -124,7 +136,7 @@ jobs:
           git diff --staged --quiet && echo "변경사항 없음" && exit 0
           git commit -m "chore: remove ${APP_NAME}"
           git push
-          echo "✅ ArgoCD prune으로 k8s 리소스 자동 삭제"
+          echo "✅ ArgoCD finalizer → K8s 리소스 + NS 자동 삭제"
 
       - name: Notify success (Telegram)
         if: success()
