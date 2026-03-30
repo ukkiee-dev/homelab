@@ -1,8 +1,5 @@
 {
   "immich": {
     "subdomain": "photos"
-  },
-  "test-blog": {
-    "subdomain": "test-blog"
   }
 }
