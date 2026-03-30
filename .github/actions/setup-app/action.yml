@@ -26,8 +26,9 @@ runs:
         token: ${{ inputs.app-token }}
         path: _homelab
 
-    # ── Step 1: apps.json + Terraform (worker는 스킵) ────────────
-    # worker 타입은 DNS/Tunnel이 불필요하므로 apps.json 수정과 terraform을 건너뜀
+    # ── Step 1: apps.json + Terraform DNS (worker는 스킵) ──────────
+    # worker 타입은 DNS가 불필요하므로 apps.json 수정과 terraform을 건너뜀
+    # Tunnel ingress는 Cloudflare 대시보드에서 수동 추가 필요
     - name: Update apps.json & Terraform
       if: ${{ inputs.type != 'worker' }}
       shell: bash
