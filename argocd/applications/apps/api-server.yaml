@@ -3,8 +3,6 @@ kind: Application
 metadata:
   name: api-server
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
   labels:
     app.kubernetes.io/name: api-server
     app.kubernetes.io/component: api
