@@ -148,7 +148,27 @@ jobs:
           git diff --staged --quiet && echo "변경사항 없음" && exit 0
           git commit -m "chore: remove ${APP_NAME}"
           git push
-          echo "✅ ArgoCD prune으로 k8s 리소스 자동 삭제"
+          echo "✅ git push 완료"
+
+      # ── Step 3.5: ArgoCD Application 삭제 (finalizer → cascade delete) ──
+      # root app이 prune: false이므로 git에서 YAML 삭제해도 Application이 자동 제거되지 않음
+      # kubectl로 직접 삭제하여 finalizer가 하위 리소스를 cascade delete
+      - name: Delete ArgoCD Application
+        continue-on-error: true
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          # kubeconfig가 없으면 스킵 (self-hosted runner에서만 동작)
+          if ! kubectl version --client > /dev/null 2>&1; then
+            echo "kubectl 미설치, ArgoCD Application 삭제 스킵 — 수동 삭제 필요"
+            exit 0
+          fi
+          if kubectl get app "$APP_NAME" -n argocd > /dev/null 2>&1; then
+            kubectl delete app "$APP_NAME" -n argocd --wait=false
+            echo "ArgoCD Application 삭제 트리거 (finalizer가 리소스 정리)"
+          else
+            echo "ArgoCD Application 이미 없음, 스킵"
+          fi
 
       - name: Notify success (Telegram)
         if: success()
