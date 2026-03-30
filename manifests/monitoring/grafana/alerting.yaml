@@ -19,6 +19,26 @@ data:
             settings:
               bottoken: $TELEGRAM_BOT_TOKEN
               chatid: "8001733025"
+              parse_mode: HTML
+              disable_web_page_preview: true
+              message: |
+                {{ if .Alerts.Firing }}🚨 <b>장애 발생</b> ({{ .Alerts.Firing | len }}건){{ range .Alerts.Firing }}
+
+                ━━━━━━━━━━━━
+                ⚠️ <b>{{ .Labels.alertname }}</b>
+                {{ if .Labels.namespace }}📍 {{ .Labels.namespace }}{{ if .Labels.pod }} / {{ .Labels.pod }}{{ end }}{{ if .Labels.deployment }} / {{ .Labels.deployment }}{{ end }}
+                {{ else if .Labels.instance }}📍 {{ .Labels.instance }}
+                {{ end }}{{ if .Labels.container }}📦 {{ .Labels.container }}
+                {{ end }}🏷 {{ if eq .Labels.severity "critical" }}치명적{{ else if eq .Labels.severity "warning" }}경고{{ else }}{{ .Labels.severity }}{{ end }}
+                📝 {{ .Annotations.summary }}
+                <a href="{{ .GeneratorURL }}">상세보기</a> · <a href="{{ .SilenceURL }}">알림 끄기</a>{{ end }}
+                {{ end }}{{ if .Alerts.Resolved }}✅ <b>복구 완료</b> ({{ .Alerts.Resolved | len }}건){{ range .Alerts.Resolved }}
+
+                ━━━━━━━━━━━━
+                ✅ <b>{{ .Labels.alertname }}</b>
+                {{ if .Labels.namespace }}📍 {{ .Labels.namespace }}{{ if .Labels.pod }} / {{ .Labels.pod }}{{ end }}
+                {{ end }}📝 {{ .Annotations.summary }}{{ end }}
+                {{ end }}
             disableResolveMessage: false
 
   policies.yaml: |
@@ -42,7 +62,7 @@ data:
         interval: 1m
         rules:
           - uid: pod-crash-looping
-            title: Pod CrashLooping
+            title: Pod 재시작 반복
             condition: C
             data:
               - refId: A
@@ -84,10 +104,10 @@ data:
             labels:
               severity: critical
             annotations:
-              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} crash looping"
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 재시작 반복 중"
 
           - uid: pod-not-ready
-            title: Pod Not Ready
+            title: Pod 미준비
             condition: C
             data:
               - refId: A
@@ -129,10 +149,10 @@ data:
             labels:
               severity: warning
             annotations:
-              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is {{ $labels.phase }}"
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} 상태: {{ $labels.phase }}"
 
           - uid: deployment-replicas-mismatch
-            title: Deployment Replicas Mismatch
+            title: 레플리카 불일치
             condition: C
             data:
               - refId: A
@@ -174,10 +194,10 @@ data:
             labels:
               severity: warning
             annotations:
-              summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has unavailable replicas"
+              summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} 레플리카 불일치"
 
           - uid: container-oom-killed
-            title: Container OOMKilled
+            title: OOM 종료
             condition: C
             data:
               - refId: A
@@ -219,7 +239,7 @@ data:
             labels:
               severity: critical
             annotations:
-              summary: "Container {{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }} was OOMKilled"
+              summary: "{{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }} 메모리 부족 종료 (OOMKilled)"
 
       - orgId: 1
         name: node-alerts
@@ -227,7 +247,7 @@ data:
         interval: 1m
         rules:
           - uid: node-memory-high
-            title: Node Memory High
+            title: 노드 메모리 과다
             condition: C
             data:
               - refId: A
@@ -269,10 +289,10 @@ data:
             labels:
               severity: warning
             annotations:
-              summary: "Node memory usage above 85%"
+              summary: "노드 메모리 사용률 85% 초과"
 
           - uid: node-disk-high
-            title: Node Disk Usage High
+            title: 노드 디스크 과다
             condition: C
             data:
               - refId: A
@@ -314,10 +334,10 @@ data:
             labels:
               severity: warning
             annotations:
-              summary: "Node disk usage above 85%"
+              summary: "노드 디스크 사용률 85% 초과"
 
           - uid: node-cpu-high
-            title: Node CPU High
+            title: 노드 CPU 과다
             condition: C
             data:
               - refId: A
@@ -359,4 +379,4 @@ data:
             labels:
               severity: warning
             annotations:
-              summary: "Node CPU usage above 90%"
+              summary: "노드 CPU 사용률 90% 초과"
