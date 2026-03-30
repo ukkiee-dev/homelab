@@ -147,8 +147,22 @@ jobs:
           git add manifests/ argocd/ terraform/apps.json
           git diff --staged --quiet && echo "변경사항 없음" && exit 0
           git commit -m "chore: remove ${APP_NAME}"
-          git push
-          echo "✅ git push 완료"
+
+          PUSHED=false
+          for i in 1 2 3; do
+            git rebase --abort 2>/dev/null || true
+            git pull --rebase origin main && git push && PUSHED=true && break || {
+              echo "push 실패 ($i/3), ${i}*5초 후 재시도..."
+              sleep $((i * 5))
+            }
+          done
+
+          if [ "$PUSHED" != "true" ]; then
+            echo "3회 retry 후에도 push 실패"
+            exit 1
+          fi
+
+          echo "git push 완료"
 
       # ── Step 3.5: ArgoCD Application 삭제 (finalizer → cascade delete) ──
       # root app이 prune: false이므로 git에서 YAML 삭제해도 Application이 자동 제거되지 않음
