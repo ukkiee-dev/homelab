@@ -1,5 +1,5 @@
 name: Setup App in Homelab
-description: Terraform(DNS) + Tunnel API → 매니페스트 생성 → git push
+description: Terraform(DNS+Tunnel) → 매니페스트 생성 → git push 순서 보장
 
 inputs:
   app-name:             { required: true }
@@ -304,8 +304,6 @@ runs:
         metadata:
           name: $APP
           namespace: argocd
-          finalizers:
-            - resources-finalizer.argocd.argoproj.io
           annotations:
             argocd.argoproj.io/sync-wave: "0"
         spec:
