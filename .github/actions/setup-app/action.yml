@@ -154,6 +154,11 @@ runs:
 
         mkdir -p _homelab/manifests/apps/$APP
 
+        # GHCR pull secret (SealedSecret) — namespace만 교체
+        sed "s/__NAMESPACE__/$APP/g" \
+          _homelab/.github/templates/ghcr-pull-secret.sealed.yaml \
+          > _homelab/manifests/apps/$APP/ghcr-pull-secret.sealed.yaml
+
         cat > _homelab/manifests/apps/$APP/deployment.yaml << EOF
         apiVersion: apps/v1
         kind: Deployment
@@ -190,7 +195,7 @@ runs:
                 seccompProfile:
                   type: RuntimeDefault
               imagePullSecrets:
-                - name: ghcr-secret
+                - name: ghcr-pull-secret
               volumes:
                 - name: tmp
                   emptyDir: {}
@@ -258,6 +263,7 @@ runs:
         apiVersion: kustomize.config.k8s.io/v1beta1
         kind: Kustomization
         resources:
+          - ghcr-pull-secret.sealed.yaml
           - deployment.yaml
         EOF
           echo "✅ manifests 생성 완료 (type=worker, Service/IngressRoute 없음)"
@@ -307,6 +313,7 @@ runs:
         apiVersion: kustomize.config.k8s.io/v1beta1
         kind: Kustomization
         resources:
+          - ghcr-pull-secret.sealed.yaml
           - deployment.yaml
           - service.yaml
           - ingressroute.yaml
