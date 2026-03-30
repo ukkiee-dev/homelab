@@ -10,7 +10,7 @@ spec:
     - web
     - websecure
   routes:
-    - match: Host(`test-blog.ukkiee.dev`)
+    - match: Host(`blog.ukkiee.dev`)
       kind: Rule
       middlewares:
         - name: security-headers
