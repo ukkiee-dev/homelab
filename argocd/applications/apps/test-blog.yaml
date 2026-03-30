@@ -3,13 +3,15 @@ kind: Application
 metadata:
   name: test-blog
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
   source:
     repoURL: https://github.com/ukkiee-dev/homelab.git
-    targetRevision: HEAD
+    targetRevision: main
     path: manifests/apps/test-blog
   destination:
     server: https://kubernetes.default.svc
