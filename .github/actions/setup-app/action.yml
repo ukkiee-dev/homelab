@@ -1,5 +1,5 @@
 name: Setup App in Homelab
-description: Terraform(DNS+Tunnel) → 매니페스트 생성 → git push 순서 보장
+description: Terraform(DNS) + Tunnel API + 매니페스트 생성 → git push
 
 inputs:
   app-name:             { required: true }
@@ -16,6 +16,11 @@ inputs:
   r2-secret-access-key: { required: true }
   domain:               { required: false, default: "ukkiee.dev" }
 
+outputs:
+  tunnel-status:
+    description: "tunnel API 결과 (success/failure)"
+    value: ${{ steps.tunnel.outcome }}
+
 runs:
   using: composite
   steps:
@@ -28,7 +33,7 @@ runs:
 
     # ── Step 1: apps.json + Terraform DNS (worker는 스킵) ──────────
     # worker 타입은 DNS가 불필요하므로 apps.json 수정과 terraform을 건너뜀
-    # Tunnel ingress는 Cloudflare 대시보드에서 수동 추가 필요
+    # Tunnel ingress는 Step 2.5에서 Cloudflare API로 자동 추가
     - name: Update apps.json & Terraform
       if: ${{ inputs.type != 'worker' }}
       shell: bash
@@ -90,8 +95,25 @@ runs:
         TF_VAR_account_id:           ${{ inputs.tf-account-id }}
         TF_VAR_domain:               ${{ inputs.domain }}
 
-    # ── Step 3: k8s 매니페스트 생성 ──────────────────────────────
+    # ── Step 2.5: Tunnel Ingress 추가 (API 직접 호출) ────────────
+    # continue-on-error: 실패해도 apps.json/terraform 변경은 push해야 함
+    # (안 그러면 다른 앱 setup에서 이 앱의 DNS가 삭제됨)
+    - name: Add tunnel ingress
+      id: tunnel
+      if: ${{ inputs.type != 'worker' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        CF_TOKEN: ${{ inputs.tf-cloudflare-token }}
+        ACCOUNT_ID: ${{ inputs.tf-account-id }}
+        TUNNEL_ID: ${{ inputs.tf-tunnel-id }}
+        TUNNEL_HOSTNAME: "${{ inputs.subdomain }}.${{ inputs.domain }}"
+      run: |
+        bash _homelab/.github/scripts/manage-tunnel-ingress.sh add "$TUNNEL_HOSTNAME"
+
+    # ── Step 3: k8s 매니페스트 생성 (tunnel 성공 시에만) ─────────
     - name: Create manifests
+      if: ${{ steps.tunnel.outcome == 'success' || inputs.type == 'worker' }}
       shell: bash
       run: |
         set -euo pipefail
@@ -293,6 +315,7 @@ runs:
         fi
 
     - name: Create ArgoCD Application
+      if: ${{ steps.tunnel.outcome == 'success' || inputs.type == 'worker' }}
       shell: bash
       run: |
         set -euo pipefail
@@ -304,13 +327,15 @@ runs:
         metadata:
           name: $APP
           namespace: argocd
+          finalizers:
+            - resources-finalizer.argocd.argoproj.io
           annotations:
             argocd.argoproj.io/sync-wave: "0"
         spec:
           project: default
           source:
             repoURL: https://github.com/ukkiee-dev/homelab.git
-            targetRevision: HEAD
+            targetRevision: main
             path: manifests/apps/$APP
           destination:
             server: https://kubernetes.default.svc
@@ -334,38 +359,49 @@ runs:
     # ── Step 4: git commit & push (terraform 완료 후) ─────────────
     - name: Commit & Push
       shell: bash
+      env:
+        TUNNEL_OUTCOME: ${{ steps.tunnel.outcome }}
+        APP_NAME: ${{ inputs.app-name }}
+        SUBDOMAIN: ${{ inputs.subdomain }}
+        DOMAIN: ${{ inputs.domain }}
+        APP_TYPE: ${{ inputs.type }}
       run: |
         set -euo pipefail
         cd _homelab
         git config user.email "deploy-bot@users.noreply.github.com"
         git config user.name "deploy-bot[bot]"
 
-        git add manifests/ argocd/ terraform/apps.json
+        git add terraform/apps.json
+
+        if [ "$TUNNEL_OUTCOME" = "success" ] || [ "$APP_TYPE" = "worker" ]; then
+          git add manifests/ argocd/
+        fi
 
         if git diff --staged --quiet; then
-          echo "⏭️  변경사항 없음, 커밋 스킵"
+          echo "변경사항 없음, 커밋 스킵"
           exit 0
         fi
 
-        SUBDOMAIN="${{ inputs.subdomain }}"
-        if [ -n "$SUBDOMAIN" ]; then
-          git commit -m "feat: add ${{ inputs.app-name }} (${SUBDOMAIN}.${{ inputs.domain }})"
+        if [ "$APP_TYPE" = "worker" ]; then
+          git commit -m "feat: add $APP_NAME (worker)"
+        elif [ "$TUNNEL_OUTCOME" = "success" ]; then
+          git commit -m "feat: add $APP_NAME ($SUBDOMAIN.$DOMAIN)"
         else
-          git commit -m "feat: add ${{ inputs.app-name }} (worker)"
+          git commit -m "feat: add DNS for $APP_NAME ($SUBDOMAIN.$DOMAIN) — tunnel 실패, manifests 미생성"
         fi
 
         PUSHED=false
         for i in 1 2 3; do
           git rebase --abort 2>/dev/null || true
           git pull --rebase origin main && git push && PUSHED=true && break || {
-            echo "⚠️  push 실패 ($i/3), ${i}*5초 후 재시도..."
+            echo "push 실패 ($i/3), ${i}*5초 후 재시도..."
             sleep $((i * 5))
           }
         done
 
         if [ "$PUSHED" != "true" ]; then
-          echo "❌ 3회 retry 후에도 push 실패"
+          echo "3회 retry 후에도 push 실패"
           exit 1
         fi
 
-        echo "✅ homelab 레포 업데이트 완료"
+        echo "homelab 레포 업데이트 완료"

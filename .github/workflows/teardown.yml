@@ -103,6 +103,30 @@ jobs:
           TF_VAR_account_id:           ${{ secrets.TF_ACCOUNT_ID }}
           TF_VAR_domain:               ${{ secrets.TF_DOMAIN }}
 
+      # ── Step 2.5: Tunnel Ingress 제거 (API) ──────────────────────
+      # teardown에서는 실패해도 계속 진행 (DNS 없으면 tunnel rule 잔존해도 실질적 영향 없음)
+      - name: Remove tunnel ingress
+        if: steps.remove.outputs.in_apps_json == 'true'
+        continue-on-error: true
+        env:
+          CF_TOKEN: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.TF_ACCOUNT_ID }}
+          TUNNEL_ID: ${{ secrets.TF_TUNNEL_ID }}
+          TUNNEL_HOSTNAME: "${{ steps.remove.outputs.subdomain }}.${{ secrets.TF_DOMAIN }}"
+        run: |
+          bash .github/scripts/manage-tunnel-ingress.sh remove "$TUNNEL_HOSTNAME"
+
+      # ── Step 2.6: GHCR 패키지 삭제 ──────────────────────────────
+      - name: Delete GHCR package
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          gh api "orgs/ukkiee-dev/packages/container/${APP_NAME}" -X DELETE \
+            && echo "GHCR 패키지 삭제 완료" \
+            || echo "GHCR 패키지 없음 또는 권한 부족 (무시)"
+
       # ── Step 3: 매니페스트 제거 & git push ─────────────────────
       - name: Remove manifests & ArgoCD Application
         env:

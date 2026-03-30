@@ -1,0 +1,120 @@
+name: Audit Orphan Apps & Tunnel Drift
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 매주 월요일 09:00 KST (00:00 UTC)
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HOMELAB_APP_ID }}
+          private-key: ${{ secrets.HOMELAB_APP_PRIVATE_KEY }}
+          owner: ukkiee-dev
+          repositories: homelab
+
+      - name: Checkout homelab
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Audit orphan apps
+        id: orphans
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # 외부 이미지 앱 — 앱 레포가 없는 것이 정상인 앱 목록
+          EXCLUDE_LIST: "immich,postgresql"
+        run: |
+          set -euo pipefail
+
+          ORPHANS=""
+          for APP in $(jq -r 'keys[]' terraform/apps.json); do
+            # 제외 목록 확인
+            if echo ",$EXCLUDE_LIST," | grep -q ",$APP,"; then
+              echo "제외: $APP (외부 이미지 앱)"
+              continue
+            fi
+
+            # 레포 존재 확인
+            if ! gh repo view "ukkiee-dev/$APP" --json name > /dev/null 2>&1; then
+              ORPHANS="${ORPHANS}${APP}\n"
+              echo "고아 앱 발견: $APP"
+            else
+              echo "정상: $APP"
+            fi
+          done
+
+          if [ -n "$ORPHANS" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            # 개행을 comma로 변환하여 output에 저장
+            echo "list=$(echo -e "$ORPHANS" | tr '\n' ',' | sed 's/,$//')" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "고아 앱 없음"
+          fi
+
+      - name: Audit tunnel drift
+        id: drift
+        env:
+          CF_TOKEN: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.TF_ACCOUNT_ID }}
+          TUNNEL_ID: ${{ secrets.TF_TUNNEL_ID }}
+          DOMAIN: ${{ secrets.TF_DOMAIN }}
+        run: |
+          set -euo pipefail
+
+          # apps.json에서 expected hostnames 추출
+          EXPECTED=$(jq -r 'to_entries[] | "\(.value.subdomain).'"${DOMAIN}"'"' terraform/apps.json | sort)
+
+          # Tunnel API에서 현재 hostnames 추출
+          ACTUAL=$(bash .github/scripts/manage-tunnel-ingress.sh list | sort)
+
+          # DNS에만 있고 Tunnel에 없는 것
+          DNS_ONLY=$(comm -23 <(echo "$EXPECTED") <(echo "$ACTUAL") || true)
+
+          # Tunnel에만 있고 DNS에 없는 것
+          TUNNEL_ONLY=$(comm -13 <(echo "$EXPECTED") <(echo "$ACTUAL") || true)
+
+          if [ -n "$DNS_ONLY" ] || [ -n "$TUNNEL_ONLY" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "dns_only=$(echo "$DNS_ONLY" | tr '\n' ',' | sed 's/,$//')" >> "$GITHUB_OUTPUT"
+            echo "tunnel_only=$(echo "$TUNNEL_ONLY" | tr '\n' ',' | sed 's/,$//')" >> "$GITHUB_OUTPUT"
+            echo "Tunnel drift 발견"
+            [ -n "$DNS_ONLY" ] && echo "DNS에만: $DNS_ONLY"
+            [ -n "$TUNNEL_ONLY" ] && echo "Tunnel에만: $TUNNEL_ONLY"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "Tunnel drift 없음"
+          fi
+
+      - name: Notify Telegram
+        if: steps.orphans.outputs.found == 'true' || steps.drift.outputs.found == 'true'
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ORPHAN_FOUND: ${{ steps.orphans.outputs.found }}
+          ORPHAN_LIST: ${{ steps.orphans.outputs.list }}
+          DRIFT_FOUND: ${{ steps.drift.outputs.found }}
+          DNS_ONLY: ${{ steps.drift.outputs.dns_only }}
+          TUNNEL_ONLY: ${{ steps.drift.outputs.tunnel_only }}
+        run: |
+          MSG="주간 감사 결과%0A"
+
+          if [ "$ORPHAN_FOUND" = "true" ]; then
+            MSG="${MSG}%0A고아 앱: ${ORPHAN_LIST}%0A정리: gh workflow run teardown.yml -f app-name=<이름>"
+          fi
+
+          if [ "$DRIFT_FOUND" = "true" ]; then
+            MSG="${MSG}%0A%0ATunnel drift:"
+            [ -n "$DNS_ONLY" ] && MSG="${MSG}%0ADNS에만: ${DNS_ONLY}"
+            [ -n "$TUNNEL_ONLY" ] && MSG="${MSG}%0ATunnel에만: ${TUNNEL_ONLY}"
+          fi
+
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d chat_id="${TG_CHAT}" \
+            -d text="$MSG"
