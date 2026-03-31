@@ -67,6 +67,19 @@ jobs:
           owner: ukkiee-dev
           repositories: homelab
 
+      - name: Check repo exists in org
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+          TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://api.github.com/repos/ukkiee-dev/${APP_NAME}")
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::ukkiee-dev/${APP_NAME} 레포가 존재하지 않습니다. org에서 템플릿으로 레포를 먼저 생성하세요."
+            exit 1
+          fi
+
       - name: Check app does not already exist
         env:
           APP_NAME: ${{ inputs.app-name }}
