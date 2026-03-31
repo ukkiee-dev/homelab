@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-tailscale-proxy
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: network-policies
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app: tailscale
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow inbound from Tailscale network (DERP/direct)
+    - {}
+  egress:
+    # Allow all outbound for Tailscale coordination, DERP, direct connections
+    - {}

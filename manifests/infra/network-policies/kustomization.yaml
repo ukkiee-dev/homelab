@@ -7,5 +7,6 @@ resources:
   - apps-allow-dns.yaml
   - apps-allow-kube-api.yaml
   - apps-allow-homepage-widgets.yaml
+  - apps-allow-tailscale-proxy.yaml
   - traefik-default-deny.yaml
   - networking-default-deny.yaml
