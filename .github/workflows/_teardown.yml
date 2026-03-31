@@ -1,0 +1,197 @@
+name: Teardown App (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        required: true
+        type: string
+    secrets:
+      APP_ID:
+        required: true
+      APP_PRIVATE_KEY:
+        required: true
+      TF_CLOUDFLARE_TOKEN:
+        required: true
+      TF_ZONE_ID:
+        required: true
+      TF_TUNNEL_ID:
+        required: true
+      TF_ACCOUNT_ID:
+        required: true
+      R2_ACCESS_KEY_ID:
+        required: true
+      R2_SECRET_ACCESS_KEY:
+        required: true
+      TF_DOMAIN:
+        required: true
+      ARGOCD_AUTH_TOKEN:
+        required: true
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-terraform
+      cancel-in-progress: false
+
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ukkiee-dev
+          repositories: homelab
+
+      - name: Checkout homelab
+        uses: actions/checkout@v4
+        with:
+          repository: ukkiee-dev/homelab
+          token: ${{ steps.app-token.outputs.token }}
+
+      # ── Step 1: apps.json 확인 & 제거 ──────────────────────────
+      - name: Check and remove from apps.json
+        id: remove
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          set -euo pipefail
+
+          IN_APPS_JSON=$(jq --arg name "$APP_NAME" 'has($name)' terraform/apps.json)
+          echo "in_apps_json=$IN_APPS_JSON" >> $GITHUB_OUTPUT
+
+          SUBDOMAIN=""
+          if [ "$IN_APPS_JSON" = "true" ]; then
+            SUBDOMAIN=$(jq -r --arg name "$APP_NAME" '.[$name].subdomain // empty' terraform/apps.json)
+            jq --arg name "$APP_NAME" 'del(.[$name])' terraform/apps.json > /tmp/apps.json
+            jq empty /tmp/apps.json
+            mv /tmp/apps.json terraform/apps.json
+            echo "apps.json에서 $APP_NAME 제거 (subdomain: $SUBDOMAIN)"
+          else
+            echo "apps.json에 $APP_NAME 없음 (worker 타입), terraform 스킵"
+          fi
+          echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
+
+      # ── Step 2: Terraform (apps.json에 있던 앱만) ──────────────
+      - name: Setup Terraform
+        if: steps.remove.outputs.in_apps_json == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Terraform Init
+        if: steps.remove.outputs.in_apps_json == 'true'
+        run: |
+          terraform init \
+            -backend-config="endpoint=https://${TF_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            -backend-config="access_key=${R2_ACCESS_KEY}" \
+            -backend-config="secret_key=${R2_SECRET_KEY}"
+        working-directory: terraform
+        env:
+          TF_ACCOUNT_ID: ${{ secrets.TF_ACCOUNT_ID }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+      - name: Terraform Plan
+        if: steps.remove.outputs.in_apps_json == 'true'
+        run: terraform plan -out=tfplan
+        working-directory: terraform
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
+          TF_VAR_zone_id:              ${{ secrets.TF_ZONE_ID }}
+          TF_VAR_tunnel_id:            ${{ secrets.TF_TUNNEL_ID }}
+          TF_VAR_account_id:           ${{ secrets.TF_ACCOUNT_ID }}
+          TF_VAR_domain:               ${{ secrets.TF_DOMAIN }}
+
+      - name: Terraform Apply
+        if: steps.remove.outputs.in_apps_json == 'true'
+        run: terraform apply tfplan
+        working-directory: terraform
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
+          TF_VAR_zone_id:              ${{ secrets.TF_ZONE_ID }}
+          TF_VAR_tunnel_id:            ${{ secrets.TF_TUNNEL_ID }}
+          TF_VAR_account_id:           ${{ secrets.TF_ACCOUNT_ID }}
+          TF_VAR_domain:               ${{ secrets.TF_DOMAIN }}
+
+      # ── Step 2.5: Tunnel Ingress 제거 ──────────────────────────
+      - name: Remove tunnel ingress
+        if: steps.remove.outputs.in_apps_json == 'true'
+        continue-on-error: true
+        env:
+          CF_TOKEN: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.TF_ACCOUNT_ID }}
+          TUNNEL_ID: ${{ secrets.TF_TUNNEL_ID }}
+          TUNNEL_HOSTNAME: "${{ steps.remove.outputs.subdomain }}.${{ secrets.TF_DOMAIN }}"
+        run: |
+          bash .github/scripts/manage-tunnel-ingress.sh remove "$TUNNEL_HOSTNAME"
+
+      # ── Step 2.6: GHCR 패키지 삭제 ────────────────────────────
+      - name: Delete GHCR package
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          gh api "orgs/ukkiee-dev/packages/container/${APP_NAME}" -X DELETE \
+            && echo "GHCR 패키지 삭제 완료" \
+            || echo "GHCR 패키지 없음 또는 권한 부족 (무시)"
+
+      # ── Step 3: 매니페스트 제거 & git push ─────────────────────
+      - name: Remove manifests & ArgoCD Application
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          set -euo pipefail
+          rm -rf "manifests/apps/${APP_NAME}"
+          rm -f "argocd/applications/apps/${APP_NAME}.yaml"
+          echo "매니페스트 제거 완료"
+
+      - name: Commit & Push
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          set -euo pipefail
+          git config user.email "deploy-bot@users.noreply.github.com"
+          git config user.name "deploy-bot[bot]"
+          git add manifests/ argocd/ terraform/apps.json
+
+          if git diff --staged --quiet; then
+            echo "변경사항 없음"
+            exit 0
+          fi
+
+          git commit -m "chore: remove ${APP_NAME}"
+
+          PUSHED=false
+          for i in 1 2 3; do
+            git rebase --abort 2>/dev/null || true
+            git pull --rebase origin main && git push && PUSHED=true && break || {
+              echo "push 실패 ($i/3), ${i}*5초 후 재시도..."
+              sleep $((i * 5))
+            }
+          done
+
+          if [ "$PUSHED" != "true" ]; then
+            echo "3회 retry 후에도 push 실패"
+            exit 1
+          fi
+
+          echo "git push 완료"
+
+      # ── Step 3.5: ArgoCD Application 삭제 (REST API) ───────────
+      # root app이 prune: false이므로 git에서 YAML 삭제해도 Application CR이 자동 제거되지 않음
+      # ArgoCD REST API로 삭제 (GitHub-hosted runner에서도 동작)
+      - name: Delete ArgoCD Application via API
+        continue-on-error: true
+        env:
+          ARGOCD_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          curl -s -X DELETE \
+            "https://argo.ukkiee.dev/api/v1/applications/${APP_NAME}?cascade=true" \
+            -H "Authorization: Bearer ${ARGOCD_TOKEN}" \
+            && echo "ArgoCD Application 삭제 완료" \
+            || echo "::warning::ArgoCD API 삭제 실패 — 수동 정리 필요"

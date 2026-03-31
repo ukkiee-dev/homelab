@@ -1,0 +1,136 @@
+name: Sync App Config
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        required: true
+        type: string
+      health:
+        required: false
+        type: string
+        default: ""
+      icon:
+        required: false
+        type: string
+        default: ""
+      description:
+        required: false
+        type: string
+        default: ""
+    secrets:
+      APP_ID:
+        required: true
+      APP_PRIVATE_KEY:
+        required: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-manifest-update
+      cancel-in-progress: false
+
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ukkiee-dev
+          repositories: homelab
+
+      - name: Checkout homelab
+        uses: actions/checkout@v4
+        with:
+          repository: ukkiee-dev/homelab
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Install yq
+        uses: mikefarah/yq@v4
+
+      - name: Update manifests
+        env:
+          APP: ${{ inputs.app-name }}
+          ICON: ${{ inputs.icon }}
+          DESC: ${{ inputs.description }}
+          HEALTH: ${{ inputs.health }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -d "manifests/apps/$APP" ]; then
+            echo "::error::manifests/apps/$APP 디렉토리가 존재하지 않습니다"
+            exit 1
+          fi
+
+          CHANGED=false
+
+          # icon 갱신
+          if [ -n "$ICON" ] && [ -f "manifests/apps/$APP/ingressroute.yaml" ]; then
+            ICON="$ICON" yq -i '.metadata.annotations["gethomepage.dev/icon"] = strenv(ICON)' \
+              manifests/apps/$APP/ingressroute.yaml
+            echo "icon -> $ICON"
+            CHANGED=true
+          fi
+
+          # description 갱신
+          if [ -n "$DESC" ] && [ -f "manifests/apps/$APP/ingressroute.yaml" ]; then
+            DESC="$DESC" yq -i '.metadata.annotations["gethomepage.dev/description"] = strenv(DESC)' \
+              manifests/apps/$APP/ingressroute.yaml
+            echo "description -> $DESC"
+            CHANGED=true
+          fi
+
+          # health path 갱신 (3개 probe 모두, path만 변경 — port는 기존 값 유지)
+          if [ -n "$HEALTH" ]; then
+            for PROBE in startupProbe livenessProbe readinessProbe; do
+              HEALTH="$HEALTH" yq -i \
+                ".spec.template.spec.containers[0].${PROBE}.httpGet.path = strenv(HEALTH)" \
+                manifests/apps/$APP/deployment.yaml
+            done
+            echo "health -> $HEALTH"
+            CHANGED=true
+          fi
+
+          if [ "$CHANGED" = "false" ]; then
+            echo "변경할 항목 없음"
+            exit 0
+          fi
+
+          echo "CHANGED=true" >> "$GITHUB_ENV"
+
+      - name: Commit & Push
+        if: env.CHANGED == 'true'
+        env:
+          APP: ${{ inputs.app-name }}
+        run: |
+          set -euo pipefail
+          git config user.email "deploy-bot@users.noreply.github.com"
+          git config user.name "deploy-bot[bot]"
+
+          git add manifests/apps/$APP/
+
+          # no-diff guard: 동일 값으로 sync 시도 시 불필요한 커밋 방지
+          if git diff --staged --quiet; then
+            echo "실제 변경 없음, 커밋 스킵"
+            exit 0
+          fi
+
+          git commit -m "chore: sync $APP config"
+
+          PUSHED=false
+          for i in 1 2 3; do
+            git rebase --abort 2>/dev/null || true
+            git pull --rebase origin main && git push && PUSHED=true && break || {
+              echo "push 실패 ($i/3), 재시도..."
+              sleep $((i * 5))
+            }
+          done
+
+          if [ "$PUSHED" != "true" ]; then
+            echo "::error::3회 retry 후에도 push 실패"
+            exit 1
+          fi
+
+          echo "매니페스트 갱신 완료"
