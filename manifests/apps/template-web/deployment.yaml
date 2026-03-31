@@ -39,7 +39,7 @@ spec:
           emptyDir: {}
       containers:
         - name: template-web
-          image: ghcr.io/ukkiee-dev/template-web:b6dec9dc8cac0fb86f6ab0a0352326b283b3704a
+          image: ghcr.io/ukkiee-dev/template-web:49893f75daf9867dc1cedb785e720a03dc58dc17
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
