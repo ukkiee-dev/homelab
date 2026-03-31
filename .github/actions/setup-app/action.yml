@@ -15,6 +15,8 @@ inputs:
   r2-access-key-id:     { required: true }
   r2-secret-access-key: { required: true }
   domain:               { required: false, default: "ukkiee.dev" }
+  icon:                 { required: false, default: "mdi-application" }
+  description:          { required: false, default: "" }
 
 outputs:
   tunnel-status:
@@ -122,6 +124,10 @@ runs:
         PORT="${{ inputs.port }}"
         SUBDOMAIN="${{ inputs.subdomain }}"
         DOMAIN="${{ inputs.domain }}"
+        ICON="${{ inputs.icon }}"
+        [ -z "$ICON" ] && ICON="mdi-application"
+        DESCRIPTION="${{ inputs.description }}"
+        [ -z "$DESCRIPTION" ] && DESCRIPTION="$APP"
 
         HEALTH_PATH="${{ inputs.health }}"
 
@@ -276,6 +282,14 @@ runs:
           namespace: $APP
           labels:
             app.kubernetes.io/name: $APP
+          annotations:
+            gethomepage.dev/enabled: "true"
+            gethomepage.dev/group: "Apps"
+            gethomepage.dev/name: "$APP"
+            gethomepage.dev/icon: "$ICON"
+            gethomepage.dev/href: "https://$SUBDOMAIN.$DOMAIN"
+            gethomepage.dev/description: "$DESCRIPTION"
+            gethomepage.dev/pod-selector: "app.kubernetes.io/name=$APP"
         spec:
           selector:
             app.kubernetes.io/name: $APP
