@@ -39,7 +39,7 @@ spec:
           emptyDir: {}
       containers:
         - name: test-app
-          image: ghcr.io/ukkiee-dev/test-app:9b7b7fd515d341aaf13a5d7b9f26787f9126bca6
+          image: ghcr.io/ukkiee-dev/test-app:e10288c400a1d215a7da761223104cc2eb3cc0d8
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
