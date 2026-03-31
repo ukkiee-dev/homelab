@@ -20,6 +20,9 @@ data:
       Services:
         style: row
         columns: 4
+      Apps:
+        style: row
+        columns: 4
       Infrastructure:
         style: row
         columns: 5
@@ -65,10 +68,6 @@ data:
               url: http://adguard.apps.svc.cluster.local:3000
               username: "{{HOMEPAGE_VAR_ADGUARD_USER}}"
               password: "{{HOMEPAGE_VAR_ADGUARD_PASS}}"
-        - API Server:
-            icon: mdi-api
-            href: https://api.ukkiee.dev/health/ping
-            description: NestJS API
     - Infrastructure:
         - Traefik:
             icon: traefik.png
