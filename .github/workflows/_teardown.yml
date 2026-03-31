@@ -187,8 +187,16 @@ jobs:
           ARGOCD_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
           APP_NAME: ${{ inputs.app-name }}
         run: |
-          curl -s -X DELETE \
+          RESP=$(curl -s -w "\n%{http_code}" --max-time 30 -X DELETE \
             "https://argo.ukkiee.dev/api/v1/applications/${APP_NAME}?cascade=true" \
-            -H "Authorization: Bearer ${ARGOCD_TOKEN}" \
-            && echo "ArgoCD Application 삭제 완료" \
-            || echo "::warning::ArgoCD API 삭제 실패 — 수동 정리 필요"
+            -H "Authorization: Bearer ${ARGOCD_TOKEN}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "ArgoCD Application 삭제 완료"
+          elif [ "$HTTP_CODE" = "404" ]; then
+            echo "ArgoCD Application 이미 없음, 스킵"
+          else
+            echo "::warning::ArgoCD API 삭제 실패 (HTTP $HTTP_CODE) — 수동 정리 필요"
+            echo "$BODY"
+          fi
