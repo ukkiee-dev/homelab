@@ -2,9 +2,6 @@
   "immich": {
     "subdomain": "photos"
   },
-  "template-web": {
-    "subdomain": "template-web"
-  },
   "test-web": {
     "subdomain": "test-web"
   }
