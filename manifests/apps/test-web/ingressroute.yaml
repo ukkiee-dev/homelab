@@ -1,0 +1,30 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: test-web
+  namespace: test-web
+  labels:
+    app.kubernetes.io/name: test-web
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: "Apps"
+    gethomepage.dev/name: "test-web"
+    gethomepage.dev/icon: "mdi-application"
+    gethomepage.dev/href: "https://test-web.ukkiee.dev"
+    gethomepage.dev/description: "test-web"
+    gethomepage.dev/pod-selector: "app.kubernetes.io/name=test-web"
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`test-web.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+          namespace: traefik-system
+        - name: gzip
+          namespace: traefik-system
+      services:
+        - name: test-web
+          port: 3000
