@@ -9,9 +9,9 @@ metadata:
     gethomepage.dev/enabled: "true"
     gethomepage.dev/group: "Apps"
     gethomepage.dev/name: "test-app"
-    gethomepage.dev/icon: "mdi-application"
+    gethomepage.dev/icon: "mdi-test-tube"
     gethomepage.dev/href: "https://test-app.ukkiee.dev"
-    gethomepage.dev/description: "test-app"
+    gethomepage.dev/description: "Homepage 자동 등록 테스트"
     gethomepage.dev/pod-selector: "app.kubernetes.io/name=test-app"
 spec:
   selector:
