@@ -19,6 +19,9 @@ runner/
 **/secret-*.yaml
 sealed-secrets-key-backup.yaml
 
+# Workspace (임시 리서치 산출물)
+_workspace/
+
 # Terraform
 **/.terraform/
 *.tfplan
