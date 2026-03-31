@@ -19,12 +19,13 @@ on:
       TELEGRAM_CHAT_ID:
         required: false
 
+concurrency:
+  group: homelab-manifest-update
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-manifest-update
-      cancel-in-progress: false
 
     steps:
       - name: Generate token
