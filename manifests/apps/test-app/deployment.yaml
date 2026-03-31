@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+  namespace: test-app
+  labels:
+    app.kubernetes.io/name: test-app
+    app.kubernetes.io/version: latest
+    app.kubernetes.io/component: web
+    app.kubernetes.io/managed-by: argocd
+spec:
+  revisionHistoryLimit: 3
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: test-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: test-app
+        app.kubernetes.io/version: latest
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: test-app
+          image: ghcr.io/ukkiee-dev/test-app:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3

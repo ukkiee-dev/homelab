@@ -1,5 +1,8 @@
 {
   "immich": {
     "subdomain": "photos"
+  },
+  "test-app": {
+    "subdomain": "test-app"
   }
 }
