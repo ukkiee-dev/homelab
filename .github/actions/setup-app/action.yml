@@ -4,7 +4,7 @@ description: Terraform(DNS) + Tunnel API + 매니페스트 생성 → git push
 inputs:
   app-name:             { required: true }
   type:                 { required: true }
-  port:                 { required: false, default: "0" }
+  port:                 { required: false, default: "0", description: "(deprecated) type 기반 자동 매핑으로 대체됨. 값을 넘겨도 무시됨." }
   subdomain:            { required: false, default: "" }
   health:               { required: false }
   app-token:            { required: true }
@@ -113,6 +113,10 @@ runs:
       run: |
         bash _homelab/.github/scripts/manage-tunnel-ingress.sh add "$TUNNEL_HOSTNAME"
 
+    # ── yq 설치 (매니페스트 YAML 정규화용) ─────────────────────
+    - name: Install yq
+      uses: mikefarah/yq@v4
+
     # ── Step 3: k8s 매니페스트 생성 (tunnel 성공 시에만) ─────────
     - name: Create manifests
       if: ${{ steps.tunnel.outcome == 'success' || inputs.type == 'worker' }}
@@ -121,7 +125,6 @@ runs:
         set -euo pipefail
         APP="${{ inputs.app-name }}"
         TYPE="${{ inputs.type }}"
-        PORT="${{ inputs.port }}"
         SUBDOMAIN="${{ inputs.subdomain }}"
         DOMAIN="${{ inputs.domain }}"
         ICON="${{ inputs.icon }}"
@@ -133,6 +136,7 @@ runs:
 
         case "$TYPE" in
           static)
+            PORT=8080
             MEMORY_REQUEST="64Mi"
             MEMORY_LIMIT="128Mi"
             CPU_REQUEST="50m"
@@ -140,6 +144,7 @@ runs:
             [ -z "$HEALTH_PATH" ] && HEALTH_PATH="/"
             ;;
           web)
+            PORT=3000
             MEMORY_REQUEST="128Mi"
             MEMORY_LIMIT="256Mi"
             CPU_REQUEST="100m"
@@ -147,6 +152,7 @@ runs:
             [ -z "$HEALTH_PATH" ] && HEALTH_PATH="/health"
             ;;
           worker)
+            PORT=0
             MEMORY_REQUEST="128Mi"
             MEMORY_LIMIT="256Mi"
             CPU_REQUEST="100m"
@@ -272,6 +278,10 @@ runs:
           - ghcr-pull-secret.sealed.yaml
           - deployment.yaml
         EOF
+          # YAML 들여쓰기 정규화 (heredoc 8스페이스 제거)
+          for f in _homelab/manifests/apps/$APP/*.yaml; do
+            yq eval -i '.' "$f"
+          done
           echo "✅ manifests 생성 완료 (type=worker, Service/IngressRoute 없음)"
         else
           cat > _homelab/manifests/apps/$APP/service.yaml << EOF
@@ -332,6 +342,10 @@ runs:
           - service.yaml
           - ingressroute.yaml
         EOF
+          # YAML 들여쓰기 정규화 (heredoc 8스페이스 제거)
+          for f in _homelab/manifests/apps/$APP/*.yaml; do
+            yq eval -i '.' "$f"
+          done
           echo "✅ manifests 생성 완료 (type=$TYPE)"
         fi
 
@@ -375,6 +389,8 @@ runs:
                 maxDuration: 3m
         EOF
 
+        # YAML 들여쓰기 정규화
+        yq eval -i '.' _homelab/argocd/applications/apps/$APP.yaml
         echo "✅ ArgoCD Application 생성 완료"
 
     # ── Step 4: git commit & push (terraform 완료 후) ─────────────
