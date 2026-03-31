@@ -4,5 +4,8 @@
   },
   "test-app": {
     "subdomain": "test-app"
+  },
+  "template-web": {
+    "subdomain": "template-web"
   }
 }

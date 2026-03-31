@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: template-web
+  namespace: template-web
+  labels:
+    app.kubernetes.io/name: template-web
+spec:
+  selector:
+    app.kubernetes.io/name: template-web
+  ports:
+    - port: 3000
+      targetPort: 3000
