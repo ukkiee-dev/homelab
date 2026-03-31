@@ -6,5 +6,6 @@ namespace: apps
 resources:
   - statefulset.yaml
   - service.yaml
+  - service-tailscale.yaml
   - ingressroute.yaml
   - pdb.yaml
