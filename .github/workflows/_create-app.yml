@@ -45,12 +45,13 @@ on:
       TELEGRAM_CHAT_ID:
         required: false
 
+concurrency:
+  group: homelab-terraform
+  cancel-in-progress: false
+
 jobs:
   create:
     runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-terraform
-      cancel-in-progress: false
 
     steps:
       # ── Validate ───────────────────────────────────────────

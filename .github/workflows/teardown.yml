@@ -7,10 +7,6 @@ on:
         description: "제거할 앱 이름"
         required: true
 
-concurrency:
-  group: homelab-terraform
-  cancel-in-progress: false
-
 jobs:
   teardown:
     uses: ./.github/workflows/_teardown.yml
