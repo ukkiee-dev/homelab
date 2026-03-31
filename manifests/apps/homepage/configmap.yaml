@@ -11,6 +11,7 @@ metadata:
 data:
   kubernetes.yaml: |
     mode: cluster
+    traefik: true
 
   settings.yaml: |
     title: Homelab
