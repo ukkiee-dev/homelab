@@ -24,10 +24,6 @@ on:
       APP_PRIVATE_KEY:
         required: true
 
-concurrency:
-  group: homelab-manifest-update
-  cancel-in-progress: false
-
 jobs:
   sync:
     runs-on: ubuntu-latest
