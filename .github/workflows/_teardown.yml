@@ -28,10 +28,6 @@ on:
       ARGOCD_AUTH_TOKEN:
         required: true
 
-concurrency:
-  group: homelab-terraform
-  cancel-in-progress: false
-
 jobs:
   teardown:
     runs-on: ubuntu-latest
