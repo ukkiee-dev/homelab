@@ -282,14 +282,6 @@ runs:
           namespace: $APP
           labels:
             app.kubernetes.io/name: $APP
-          annotations:
-            gethomepage.dev/enabled: "true"
-            gethomepage.dev/group: "Apps"
-            gethomepage.dev/name: "$APP"
-            gethomepage.dev/icon: "$ICON"
-            gethomepage.dev/href: "https://$SUBDOMAIN.$DOMAIN"
-            gethomepage.dev/description: "$DESCRIPTION"
-            gethomepage.dev/pod-selector: "app.kubernetes.io/name=$APP"
         spec:
           selector:
             app.kubernetes.io/name: $APP
@@ -306,6 +298,14 @@ runs:
           namespace: $APP
           labels:
             app.kubernetes.io/name: $APP
+          annotations:
+            gethomepage.dev/enabled: "true"
+            gethomepage.dev/group: "Apps"
+            gethomepage.dev/name: "$APP"
+            gethomepage.dev/icon: "$ICON"
+            gethomepage.dev/href: "https://$SUBDOMAIN.$DOMAIN"
+            gethomepage.dev/description: "$DESCRIPTION"
+            gethomepage.dev/pod-selector: "app.kubernetes.io/name=$APP"
         spec:
           entryPoints:
             - web
