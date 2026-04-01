@@ -64,22 +64,24 @@ spec:
                   key: CHAT_ID
           resources:
             requests:
-              cpu: 50m
-              memory: 160Mi
-            limits:
-              cpu: 300m
+              cpu: 100m
               memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           livenessProbe:
             httpGet:
               path: /api/health
               port: 3000
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
+            timeoutSeconds: 5
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /api/health
               port: 3000
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
+            timeoutSeconds: 5
             periodSeconds: 10
           volumeMounts:
             - name: data
