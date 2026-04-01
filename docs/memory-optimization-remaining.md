@@ -28,55 +28,11 @@ kubectl get pods -n apps -l app.kubernetes.io/name=postgresql -o custom-columns=
 
 ---
 
-## 2. ResourceQuota 재활성화 (Phase 3.4)
-
-**전제조건**: 모든 helm upgrade 완료 + 워크로드가 새 리소스 값으로 안정 실행 확인
-
-**현재 상태**: `manifests/infra/scheduling/kustomization.yaml`에서 ResourceQuota 8개가 주석 처리됨.
-
-**작업**:
-1. kustomization.yaml에서 ResourceQuota 주석 해제
-2. 커밋 + 푸시
-3. ArgoCD scheduling app이 자동 sync로 적용
-
-```yaml
-# manifests/infra/scheduling/kustomization.yaml 에서 아래 주석 해제:
-  - resourcequota-immich.yaml
-  - resourcequota-argocd.yaml
-  - resourcequota-monitoring.yaml
-  - resourcequota-apps.yaml
-  - resourcequota-tailscale-system.yaml
-  - resourcequota-traefik-system.yaml
-  - resourcequota-networking.yaml
-  - resourcequota-test-web.yaml
-```
-
-**주의**: 활성화 전 반드시 현재 사용량이 quota 이하인지 확인:
-```bash
-for ns in argocd immich monitoring apps tailscale-system traefik-system networking test-web; do
-  echo "=== $ns ==="
-  kubectl top pods -n $ns --no-headers 2>/dev/null | awk '{sum+=$3} END {print "memory used:", sum"Mi"}'
-done
-```
+## ~~2. ResourceQuota 재활성화 (Phase 3.4)~~ ✅ 완료 (2026-04-01)
 
 ---
 
-## 3. ArgoCD image-updater 리소스 조정 (Phase 2.3 잔여)
-
-image-updater는 별도 Helm release(`argocd-image-updater`)로 관리됨. 본 최적화에서 아직 미처리.
-
-**목표**: req 64→32Mi, lim 128→48Mi
-
-```bash
-# image-updater Helm release 확인
-helm list -n argocd --filter image-updater
-
-# 업그레이드 (values 파일 확인 후)
-helm upgrade argocd-image-updater argo/argocd-image-updater -n argocd \
-  --reuse-values \
-  --set resources.requests.memory=32Mi \
-  --set resources.limits.memory=48Mi
-```
+## ~~3. ArgoCD image-updater 리소스 조정 (Phase 2.3 잔여)~~ ✅ 완료 (2026-04-01)
 
 ---
 
