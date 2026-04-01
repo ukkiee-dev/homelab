@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/component: cache
         app.kubernetes.io/part-of: homelab
     spec:
+      priorityClassName: core-services
       securityContext:
         runAsNonRoot: true
         runAsUser: 999
@@ -41,11 +42,11 @@ spec:
               containerPort: 6379
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
+              cpu: 25m
+              memory: 24Mi
             limits:
-              cpu: 200m
-              memory: 128Mi
+              cpu: 100m
+              memory: 32Mi
           livenessProbe:
             exec:
               command: ["redis-cli", "ping"]

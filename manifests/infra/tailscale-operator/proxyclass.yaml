@@ -1,0 +1,17 @@
+apiVersion: tailscale.com/v1alpha1
+kind: ProxyClass
+metadata:
+  name: default-proxy
+  namespace: tailscale-system
+spec:
+  statefulSet:
+    pod:
+      containers:
+        - name: tailscale
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
+            limits:
+              cpu: 100m
+              memory: 96Mi

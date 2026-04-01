@@ -84,13 +84,18 @@ podSecurityContext:
   runAsGroup: 65532
   fsGroup: 65532
 
+priorityClassName: infra-critical
+
+updateStrategy:
+  type: Recreate
+
 resources:
   requests:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 50m
+    memory: 48Mi
   limits:
-    cpu: 300m
-    memory: 256Mi
+    cpu: 200m
+    memory: 96Mi
 
 
 service:

@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/component: database
         app.kubernetes.io/part-of: homelab
     spec:
+      priorityClassName: core-services
       securityContext:
         runAsUser: 999
         runAsGroup: 999
@@ -66,10 +67,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 128Mi
             limits:
               cpu: "1"
-              memory: 1Gi
+              memory: 384Mi
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", "postgres", "-d", "immich"]
