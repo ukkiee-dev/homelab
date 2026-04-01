@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: memory-quota
+  namespace: monitoring
+spec:
+  hard:
+    requests.memory: 730Mi
+    limits.memory: 1300Mi

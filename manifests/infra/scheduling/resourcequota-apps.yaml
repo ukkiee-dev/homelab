@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: memory-quota
+  namespace: apps
+spec:
+  hard:
+    requests.memory: 540Mi
+    limits.memory: 970Mi

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: memory-quota
+  namespace: argocd
+spec:
+  hard:
+    requests.memory: 620Mi
+    limits.memory: 1100Mi

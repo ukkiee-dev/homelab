@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: memory-quota
+  namespace: immich
+spec:
+  hard:
+    requests.memory: 1280Mi
+    limits.memory: 2000Mi
