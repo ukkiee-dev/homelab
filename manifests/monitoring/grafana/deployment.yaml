@@ -90,6 +90,18 @@ spec:
             - name: alerting
               mountPath: /etc/grafana/provisioning/alerting
               readOnly: true
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
+            - name: dashboards-kubernetes
+              mountPath: /var/lib/grafana/dashboards/kubernetes
+              readOnly: true
+            - name: dashboards-node
+              mountPath: /var/lib/grafana/dashboards/node
+              readOnly: true
+            - name: dashboards-workload
+              mountPath: /var/lib/grafana/dashboards/workload
+              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -100,3 +112,15 @@ spec:
         - name: alerting
           configMap:
             name: grafana-alerting
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboards-kubernetes
+          configMap:
+            name: grafana-dashboards-kubernetes
+        - name: dashboards-node
+          configMap:
+            name: grafana-dashboards-node
+        - name: dashboards-workload
+          configMap:
+            name: grafana-dashboards-workload
