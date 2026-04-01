@@ -5,7 +5,7 @@
 configs:
   cm:
     url: https://argo.ukkiee.dev
-    accounts.ukkiee: apiKey, login
+    # accounts.ukkiee는 argocd-server가 직접 관리 (Helm field manager 충돌 방지)
   rbac:
     policy.csv: |
       g, ukkiee, role:admin
@@ -16,8 +16,6 @@ global:
 server:
   extraArgs:
     - --insecure  # Traefik handles TLS
-  deploymentStrategy:
-    type: Recreate
   resources:
     requests:
       cpu: 25m
@@ -27,8 +25,6 @@ server:
       memory: 96Mi
 
 controller:
-  deploymentStrategy:
-    type: Recreate
   resources:
     requests:
       cpu: 100m
@@ -38,8 +34,6 @@ controller:
       memory: 512Mi
 
 repoServer:
-  deploymentStrategy:
-    type: Recreate
   resources:
     requests:
       cpu: 25m
