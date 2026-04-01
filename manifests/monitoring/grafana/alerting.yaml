@@ -23,8 +23,7 @@ data:
               disable_web_page_preview: true
               message: |
                 {{ if .Alerts.Firing }}🚨 <b>장애 발생</b> ({{ .Alerts.Firing | len }}건){{ range .Alerts.Firing }}
-
-⚠️ <b>{{ .Labels.alertname }}</b>
+                ⚠️ <b>{{ .Labels.alertname }}</b>
                 {{ if .Labels.namespace }}📍 {{ .Labels.namespace }}{{ if .Labels.pod }} / {{ .Labels.pod }}{{ end }}{{ if .Labels.deployment }} / {{ .Labels.deployment }}{{ end }}
                 {{ else if .Labels.instance }}📍 {{ .Labels.instance }}
                 {{ end }}{{ if .Labels.container }}📦 {{ .Labels.container }}
@@ -32,8 +31,7 @@ data:
                 📝 {{ .Annotations.summary }}
                 <a href="{{ .GeneratorURL }}">상세보기</a> · <a href="{{ .SilenceURL }}">알림 끄기</a>{{ end }}
                 {{ end }}{{ if .Alerts.Resolved }}✅ <b>복구 완료</b> ({{ .Alerts.Resolved | len }}건){{ range .Alerts.Resolved }}
-
-✅ <b>{{ .Labels.alertname }}</b>
+                ✅ <b>{{ .Labels.alertname }}</b>
                 {{ if .Labels.namespace }}📍 {{ .Labels.namespace }}{{ if .Labels.pod }} / {{ .Labels.pod }}{{ end }}
                 {{ end }}📝 {{ .Annotations.summary }}{{ end }}
                 {{ end }}
