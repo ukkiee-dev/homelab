@@ -5,3 +5,4 @@ namespace: tailscale-system
 
 resources:
   - namespace.yaml
+  - proxyclass.yaml

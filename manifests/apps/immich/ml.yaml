@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/component: machine-learning
         app.kubernetes.io/part-of: homelab
     spec:
+      priorityClassName: core-services
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -47,7 +48,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "2"
-              memory: 768Mi
+              memory: 384Mi
           startupProbe:
             httpGet:
               path: /ping

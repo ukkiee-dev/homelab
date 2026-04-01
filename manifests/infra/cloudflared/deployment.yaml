@@ -20,6 +20,7 @@ spec:
         app.kubernetes.io/component: tunnel
         app.kubernetes.io/part-of: homelab
     spec:
+      priorityClassName: infra-critical
       containers:
         - name: cloudflared
           image: cloudflare/cloudflared:2026.3.0
@@ -37,11 +38,11 @@ spec:
                   key: tunnel-token
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
+              cpu: 10m
+              memory: 24Mi
             limits:
-              cpu: 200m
-              memory: 128Mi
+              cpu: 100m
+              memory: 48Mi
           livenessProbe:
             httpGet:
               path: /ready

@@ -25,6 +25,7 @@ spec:
         app.kubernetes.io/name: test-web
         app.kubernetes.io/version: latest
     spec:
+      priorityClassName: standard
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -54,11 +55,11 @@ spec:
               protocol: TCP
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              memory: "32Mi"
+              cpu: "25m"
             limits:
-              memory: "256Mi"
-              cpu: "200m"
+              memory: "48Mi"
+              cpu: "100m"
           startupProbe:
             httpGet:
               path: /health

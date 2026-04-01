@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/component: photo-library
         app.kubernetes.io/part-of: homelab
     spec:
+      priorityClassName: core-services
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -60,10 +61,10 @@ spec:
           resources:
             requests:
               cpu: 200m
-              memory: 256Mi
+              memory: 512Mi
             limits:
               cpu: "1"
-              memory: 1Gi
+              memory: 768Mi
           startupProbe:
             httpGet:
               path: /api/server/ping

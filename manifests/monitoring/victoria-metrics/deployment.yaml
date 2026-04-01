@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/part-of: homelab
         app.kubernetes.io/managed-by: argocd
     spec:
+      priorityClassName: core-services
       serviceAccountName: victoria-metrics
       securityContext:
         runAsUser: 65534
@@ -43,10 +44,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 128Mi
+              memory: 224Mi
             limits:
               cpu: 500m
-              memory: 384Mi
+              memory: 320Mi
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false

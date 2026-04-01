@@ -17,11 +17,19 @@ spec:
       backoffLimit: 1
       template:
         spec:
+          priorityClassName: batch-low
           restartPolicy: Never
           initContainers:
             # Step 1: pg_dump (완료 후에만 restic 실행)
             - name: pgdump
               image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
               command:
                 - sh
                 - -c
@@ -44,6 +52,13 @@ spec:
             # Step 2: Restic backup (로컬 + R2)
             - name: restic
               image: restic/restic:0.17.3
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
               command:
                 - sh
                 - -c

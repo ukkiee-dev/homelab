@@ -18,10 +18,18 @@ spec:
       backoffLimit: 1
       template:
         spec:
+          priorityClassName: batch-low
           restartPolicy: Never
           containers:
             - name: pgdump
               image: bitnami/postgresql:latest
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 48Mi
+                limits:
+                  cpu: 200m
+                  memory: 96Mi
               command:
                 - sh
                 - -c
