@@ -11,11 +11,13 @@ resources:
   - limitrange-traefik-system.yaml
   - limitrange-networking.yaml
   - limitrange-test-web.yaml
-  - resourcequota-immich.yaml
-  - resourcequota-argocd.yaml
-  - resourcequota-monitoring.yaml
-  - resourcequota-apps.yaml
-  - resourcequota-tailscale-system.yaml
-  - resourcequota-traefik-system.yaml
-  - resourcequota-networking.yaml
-  - resourcequota-test-web.yaml
+  # ResourceQuota는 모든 워크로드 리소스 조정 완료 후 활성화
+  # helm upgrade (ArgoCD, Reloader, PostgreSQL) 완료 후 아래 주석 해제
+  # - resourcequota-immich.yaml
+  # - resourcequota-argocd.yaml
+  # - resourcequota-monitoring.yaml
+  # - resourcequota-apps.yaml
+  # - resourcequota-tailscale-system.yaml
+  # - resourcequota-traefik-system.yaml
+  # - resourcequota-networking.yaml
+  # - resourcequota-test-web.yaml
