@@ -12,4 +12,6 @@ configMapGenerator:
     files:
       - cluster-global.json
       - namespaces.json
+      - nodes.json
+      - persistent-volumes.json
       - pods.json
