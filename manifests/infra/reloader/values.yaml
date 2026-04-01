@@ -1,0 +1,16 @@
+# Reloader Helm Values
+# helm upgrade reloader oci://ghcr.io/stakater/charts/reloader -n kube-system -f values.yaml
+#
+# 주의: 현재 Helm release에서 resources가 top-level에 잘못 설정되어 적용 안 됨.
+# 올바른 경로: reloader.deployment.resources
+
+reloader:
+  watchGlobally: true
+  deployment:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 48Mi
+      limits:
+        cpu: 100m
+        memory: 96Mi
