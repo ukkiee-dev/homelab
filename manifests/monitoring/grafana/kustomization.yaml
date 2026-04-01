@@ -10,3 +10,5 @@ resources:
   - ingressroute.yaml
   - sealed-secret.yaml
   - telegram-sealed-secret.yaml
+  - dashboard-provider.yaml
+  - dashboards
