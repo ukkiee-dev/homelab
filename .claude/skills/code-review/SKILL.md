@@ -13,12 +13,12 @@ description: "종합 코드 리뷰 오케스트레이터. 아키텍처, 보안, 
 
 ## 에이전트 풀
 
-| 에이전트 | 모델 | 리뷰 차원 |
-|---------|------|----------|
-| `arch-reviewer` | opus | 모듈 구조, 의존성, 설계 패턴, 확장성 |
-| `security-reviewer` | opus | OWASP Top 10, 인증/인가, 인젝션, 시크릿 |
-| `perf-reviewer` | opus | 복잡도, N+1, 메모리, 동시성, 캐싱 |
-| `style-reviewer` | opus | 가독성, 네이밍, DRY, 타입, 테스트 |
+| 에이전트 | subagent_type | 모델 | 리뷰 차원 |
+|---------|--------------|------|----------|
+| `arch-reviewer` | arch-reviewer | opus | 모듈 구조, 의존성, 설계 패턴, 확장성 |
+| `security-reviewer` | security-reviewer | opus | OWASP Top 10, 인증/인가, 인젝션, 시크릿 |
+| `perf-reviewer` | perf-reviewer | opus | 복잡도, N+1, 메모리, 동시성, 캐싱 |
+| `style-reviewer` | style-reviewer | opus | 가독성, 네이밍, DRY, 타입, 테스트 |
 
 ## 워크플로우
 
@@ -50,10 +50,30 @@ description: "종합 코드 리뷰 오케스트레이터. 아키텍처, 보안, 
 - 결과를 `_workspace/` 지정 파일에 저장하라는 지시
 
 ```
-Agent(arch-reviewer, run_in_background=true, prompt: "...")
-Agent(security-reviewer, run_in_background=true, prompt: "...")
-Agent(perf-reviewer, run_in_background=true, prompt: "...")
-Agent(style-reviewer, run_in_background=true, prompt: "...")
+Agent(
+  subagent_type: "arch-reviewer",
+  model: "opus",
+  run_in_background: true,
+  prompt: "..."
+)
+Agent(
+  subagent_type: "security-reviewer",
+  model: "opus",
+  run_in_background: true,
+  prompt: "..."
+)
+Agent(
+  subagent_type: "perf-reviewer",
+  model: "opus",
+  run_in_background: true,
+  prompt: "..."
+)
+Agent(
+  subagent_type: "style-reviewer",
+  model: "opus",
+  run_in_background: true,
+  prompt: "..."
+)
 ```
 
 ### Phase 3: 통합 보고서 작성

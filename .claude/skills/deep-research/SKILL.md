@@ -13,11 +13,11 @@ description: "어떤 주제든 웹/학술/커뮤니티 3개 각도에서 병렬 
 
 ## 에이전트 풀
 
-| 에이전트 | 타입 | 모델 | 조사 영역 |
-|---------|------|------|----------|
-| `web-researcher` | general-purpose | opus | 웹, 뉴스, 공식 문서, 블로그 |
-| `academic-researcher` | general-purpose | opus | 논문, 연구 보고서, 기술 백서 |
-| `community-researcher` | general-purpose | opus | Reddit, HN, 포럼, SNS, 실사용 경험 |
+| 에이전트 | subagent_type | 모델 | 조사 영역 |
+|---------|--------------|------|----------|
+| `web-researcher` | web-researcher | opus | 웹, 뉴스, 공식 문서, 블로그 |
+| `academic-researcher` | academic-researcher | opus | 논문, 연구 보고서, 기술 백서 |
+| `community-researcher` | community-researcher | opus | Reddit, HN, 포럼, SNS, 실사용 경험 |
 
 ## 워크플로우
 
@@ -40,20 +40,32 @@ description: "어떤 주제든 웹/학술/커뮤니티 3개 각도에서 병렬 
 3개 에이전트를 **동시에** 스폰한다. 모든 Agent 호출에 `model: "opus"` 필수.
 
 ```
-Agent(web-researcher, run_in_background=true,
+Agent(
+  subagent_type: "web-researcher",
+  model: "opus",
+  run_in_background: true,
   prompt: "주제: [주제]\n핵심 질문: [질문들]\n범위: [범위]\n
   조사 결과를 _workspace/01_web_findings.md에 저장하라.
-  에이전트 정의(.claude/agents/web-researcher.md)의 출력 형식을 따르라.")
+  에이전트 정의(.claude/agents/web-researcher.md)의 출력 형식을 따르라."
+)
 
-Agent(academic-researcher, run_in_background=true,
+Agent(
+  subagent_type: "academic-researcher",
+  model: "opus",
+  run_in_background: true,
   prompt: "주제: [주제]\n핵심 질문: [질문들]\n범위: [범위]\n
   조사 결과를 _workspace/02_academic_findings.md에 저장하라.
-  에이전트 정의(.claude/agents/academic-researcher.md)의 출력 형식을 따르라.")
+  에이전트 정의(.claude/agents/academic-researcher.md)의 출력 형식을 따르라."
+)
 
-Agent(community-researcher, run_in_background=true,
+Agent(
+  subagent_type: "community-researcher",
+  model: "opus",
+  run_in_background: true,
   prompt: "주제: [주제]\n핵심 질문: [질문들]\n범위: [범위]\n
   조사 결과를 _workspace/03_community_findings.md에 저장하라.
-  에이전트 정의(.claude/agents/community-researcher.md)의 출력 형식을 따르라.")
+  에이전트 정의(.claude/agents/community-researcher.md)의 출력 형식을 따르라."
+)
 ```
 
 ### Phase 3: 교차 검증

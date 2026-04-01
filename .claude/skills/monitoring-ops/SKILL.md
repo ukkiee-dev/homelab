@@ -13,12 +13,12 @@ Phase A에서 3명이 병렬 생성, Phase B에서 리뷰어가 통합 검증한
 
 ## 에이전트 풀
 
-| 에이전트 | 모델 | 역할 |
-|---------|------|------|
-| `dashboard-designer` | opus | Grafana 대시보드 JSON 설계·생성 |
-| `alert-engineer` | opus | 알람 규칙 작성, 임계값, Telegram 라우팅 |
-| `query-optimizer` | opus | PromQL/LogsQL 작성·최적화 |
-| `observability-reviewer` | opus | 메트릭·로그·알람·대시보드 통합 검증 |
+| 에이전트 | subagent_type | 모델 | 역할 |
+|---------|--------------|------|------|
+| `dashboard-designer` | dashboard-designer | opus | Grafana 대시보드 JSON 설계·생성 |
+| `alert-engineer` | alert-engineer | opus | 알람 규칙 작성, 임계값, Telegram 라우팅 |
+| `query-optimizer` | query-optimizer | opus | PromQL/LogsQL 작성·최적화 |
+| `observability-reviewer` | observability-reviewer | opus | 메트릭·로그·알람·대시보드 통합 검증 |
 
 ## 워크플로우
 
@@ -40,20 +40,32 @@ Phase A에서 3명이 병렬 생성, Phase B에서 리뷰어가 통합 검증한
 앱 정보(이름, 네임스페이스, 포트, 메트릭 엔드포인트 유무)를 수집한 뒤 3개 에이전트를 동시에 스폰한다.
 
 ```
-Agent(dashboard-designer, run_in_background=true,
+Agent(
+  subagent_type: "dashboard-designer",
+  model: "opus",
+  run_in_background: true,
   prompt: "앱: [앱명], ns: [네임스페이스], 포트: [포트]
   메트릭 엔드포인트: [있음/없음]
-  에이전트 정의를 읽고 대시보드 JSON + 요약을 _workspace/에 저장하라.")
+  에이전트 정의를 읽고 대시보드 JSON + 요약을 _workspace/에 저장하라."
+)
 
-Agent(alert-engineer, run_in_background=true,
+Agent(
+  subagent_type: "alert-engineer",
+  model: "opus",
+  run_in_background: true,
   prompt: "앱: [앱명], ns: [네임스페이스]
   기존 알람 규칙: manifests/monitoring/grafana/alerting.yaml 참조
-  에이전트 정의를 읽고 앱 전용 알람 규칙 YAML + 요약을 _workspace/에 저장하라.")
+  에이전트 정의를 읽고 앱 전용 알람 규칙 YAML + 요약을 _workspace/에 저장하라."
+)
 
-Agent(query-optimizer, run_in_background=true,
+Agent(
+  subagent_type: "query-optimizer",
+  model: "opus",
+  run_in_background: true,
   prompt: "앱: [앱명], ns: [네임스페이스], 포트: [포트]
   대시보드와 알람에 사용할 PromQL/LogsQL 쿼리를 설계하라.
-  에이전트 정의를 읽고 쿼리 목록을 _workspace/에 저장하라.")
+  에이전트 정의를 읽고 쿼리 목록을 _workspace/에 저장하라."
+)
 ```
 
 ### Phase 2B: 통합 검증
@@ -61,10 +73,13 @@ Agent(query-optimizer, run_in_background=true,
 3개 산출물이 완료되면 리뷰어를 스폰한다:
 
 ```
-Agent(observability-reviewer, model: "opus",
+Agent(
+  subagent_type: "observability-reviewer",
+  model: "opus",
   prompt: "_workspace/ 의 01~03 파일과 앱 매니페스트를 읽고
   메트릭·로그·알람·대시보드 완성도를 종합 검증하라.
-  에이전트 정의의 체크리스트를 따르고 결과를 _workspace/04_observability_review.md에 저장하라.")
+  에이전트 정의의 체크리스트를 따르고 결과를 _workspace/04_observability_review.md에 저장하라."
+)
 ```
 
 ### Phase 3: 결과 통합

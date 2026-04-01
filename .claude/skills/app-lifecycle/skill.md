@@ -13,12 +13,12 @@ description: "홈랩 앱 라이프사이클 오케스트레이터. 아이디어 
 
 ## 에이전트 풀
 
-| 에이전트 | 타입 | 모델 | 라이프사이클 단계 |
-|---------|------|------|----------------|
-| `app-architect` | general-purpose | opus | 설계 (Design) |
-| `provisioning-engineer` | general-purpose | opus | 프로비저닝 (Provision) |
-| `verification-agent` | general-purpose | opus | 검증 (Verify) |
-| `decommission-manager` | general-purpose | opus | 폐기 (Decommission) |
+| 에이전트 | subagent_type | 모델 | 라이프사이클 단계 |
+|---------|--------------|------|----------------|
+| `app-architect` | app-architect | opus | 설계 (Design) |
+| `provisioning-engineer` | provisioning-engineer | opus | 프로비저닝 (Provision) |
+| `verification-agent` | verification-agent | opus | 검증 (Verify) |
+| `decommission-manager` | decommission-manager | opus | 폐기 (Decommission) |
 
 기존 에이전트 연동:
 | 에이전트 | 연동 방식 |
@@ -50,8 +50,11 @@ description: "홈랩 앱 라이프사이클 오케스트레이터. 아이디어 
 
 ```
 Phase 1: 설계
-  Agent(app-architect, model: opus)
-  → 입력: 사용자 요청 + 프로젝트 컨텍스트
+  Agent(
+    subagent_type: "app-architect",
+    model: "opus",
+    prompt: "사용자 요청 + 프로젝트 컨텍스트"
+  )
   → 산출: 설계 문서
 
 Phase 2: 사용자 확인
@@ -59,13 +62,19 @@ Phase 2: 사용자 확인
   → 승인되면 Phase 3으로
 
 Phase 3: 프로비저닝
-  Agent(provisioning-engineer, model: opus)
-  → 입력: 확정된 설계 문서
+  Agent(
+    subagent_type: "provisioning-engineer",
+    model: "opus",
+    prompt: "확정된 설계 문서"
+  )
   → 산출: 생성된 파일 목록
 
 Phase 4: 검증
-  Agent(verification-agent, model: opus)
-  → 입력: 앱 이름 + 네임스페이스 + 설계 문서
+  Agent(
+    subagent_type: "verification-agent",
+    model: "opus",
+    prompt: "앱 이름 + 네임스페이스 + 설계 문서"
+  )
   → 산출: 검증 보고서
 
 Phase 5: 결과 종합
@@ -78,8 +87,11 @@ Phase 5: 결과 종합
 
 ```
 Phase 1: 영향 분석
-  Agent(decommission-manager, model: opus)
-  → 입력: 앱 이름 + 제거 이유
+  Agent(
+    subagent_type: "decommission-manager",
+    model: "opus",
+    prompt: "앱 이름 + 제거 이유"
+  )
   → 산출: 제거 계획
 
 Phase 2: 사용자 확인

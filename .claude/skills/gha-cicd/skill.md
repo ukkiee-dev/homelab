@@ -43,17 +43,24 @@ GitHub Actions 워크플로우의 작성·리뷰·디버깅·테스트를 전문
 #### 파이프라인 실행 (워크플로우 생성)
 
 ```
-Phase 1: Agent(workflow-builder, model: opus)
-  → 워크플로우 YAML 생성
-  → _workspace/에 산출물 경로 기록
+Phase 1: Agent(
+  subagent_type: "workflow-builder",
+  model: "opus",
+  prompt: "워크플로우 YAML 생성: ..."
+) → _workspace/에 산출물 경로 기록
 
-Phase 2: Agent(pipeline-reviewer, model: opus)
-  → Phase 1 산출물 리뷰
-  → PASS: Phase 3로 진행
+Phase 2: Agent(
+  subagent_type: "pipeline-reviewer",
+  model: "opus",
+  prompt: "Phase 1 산출물 리뷰: ..."
+) → PASS: Phase 3로 진행
   → WARN/FAIL: 리뷰 결과를 담아 workflow-builder 재호출 → 수정 → 재리뷰 (최대 2회)
 
-Phase 3: Agent(workflow-tester, model: opus)
-  → 최종 워크플로우에 대한 테스트 계획 수립
+Phase 3: Agent(
+  subagent_type: "workflow-tester",
+  model: "opus",
+  prompt: "최종 워크플로우에 대한 테스트 계획 수립: ..."
+)
 ```
 
 #### 단독 실행
@@ -67,9 +74,21 @@ Agent(
 
 #### 실패 분석 → 수정
 ```
-Phase 1: Agent(pipeline-debugger) → 근본 원인 분석
-Phase 2: 수정 필요 시 → Agent(workflow-builder) → 워크플로우 수정
-Phase 3: Agent(pipeline-reviewer) → 수정된 워크플로우 리뷰
+Phase 1: Agent(
+  subagent_type: "pipeline-debugger",
+  model: "opus",
+  prompt: "근본 원인 분석: ..."
+)
+Phase 2: 수정 필요 시 → Agent(
+  subagent_type: "workflow-builder",
+  model: "opus",
+  prompt: "워크플로우 수정: ..."
+)
+Phase 3: Agent(
+  subagent_type: "pipeline-reviewer",
+  model: "opus",
+  prompt: "수정된 워크플로우 리뷰: ..."
+)
 ```
 
 ### 3단계: 결과 종합
