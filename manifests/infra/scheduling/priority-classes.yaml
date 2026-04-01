@@ -1,0 +1,31 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: infra-critical
+value: 900
+globalDefault: false
+description: "L1: traefik, cloudflared, sealed-secrets, argocd core"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: core-services
+value: 500
+globalDefault: false
+description: "L2: DB, monitoring, core apps (immich, adguard, uptime-kuma), reloader, tailscale"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: standard
+value: 100
+globalDefault: true
+description: "L3: homepage, test-web, argocd-image-updater"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: batch-low
+value: 10
+globalDefault: false
+description: "L4: CronJob (backup)"
