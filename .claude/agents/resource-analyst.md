@@ -1,6 +1,7 @@
 ---
 name: resource-analyst
 description: "K8s 클러스터 리소스 실사용량 분석 전문가. kubectl top과 VictoriaMetrics PromQL로 메모리/CPU 사용 패턴을 분석하고, 과잉/부족 할당을 식별한다."
+model: opus
 ---
 
 # Resource Analyst — 클러스터 리소스 사용량 분석 전문가
