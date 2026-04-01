@@ -1,15 +1,16 @@
 # K8s 메모리 최적화 — 남은 작업
 
-> 작성: 2026-04-01 | 선행 완료: Phase 0~3 Git 변경 + ArgoCD/Reloader helm upgrade
+> 최종 업데이트: 2026-04-01
+> 완료: Phase 0~3 + ResourceQuota 재활성화 + image-updater 조정
 
 ---
 
 ## 1. PostgreSQL helm upgrade (Phase 2.5)
 
-**전제조건**: cadvisor 24h 피크 데이터 확보 후 (Phase 0.5에서 scrape config 추가 완료)
+**전제조건**: cadvisor 24h 피크 데이터 확보 후 (scrape config 2026-04-01 추가, 2026-04-02 이후 실행 가능)
 
 ```bash
-# 실행 전 24h 피크 확인 (Grafana 또는 PromQL)
+# 실행 전 24h 피크 확인
 # max_over_time(container_memory_working_set_bytes{container="postgresql", namespace="apps"}[24h])
 
 helm upgrade postgresql oci://registry-1.docker.io/bitnamicharts/postgresql -n apps \
@@ -21,26 +22,12 @@ helm upgrade postgresql oci://registry-1.docker.io/bitnamicharts/postgresql -n a
 helm get values -a postgresql -n apps > manifests/apps/postgresql/helm-values.yaml
 ```
 
-**검증**:
-```bash
-kubectl get pods -n apps -l app.kubernetes.io/name=postgresql -o custom-columns="NAME:.metadata.name,REQ:.spec.containers[0].resources.requests.memory,LIM:.spec.containers[0].resources.limits.memory"
-```
-
 ---
 
-## ~~2. ResourceQuota 재활성화 (Phase 3.4)~~ ✅ 완료 (2026-04-01)
-
----
-
-## ~~3. ArgoCD image-updater 리소스 조정 (Phase 2.3 잔여)~~ ✅ 완료 (2026-04-01)
-
----
-
-## 4. Phase 4: kubelet eviction threshold
+## 2. kubelet eviction threshold (Phase 4)
 
 **방안 A**: K3s kubelet arg 설정 (OrbStack 지원 시)
 ```bash
-# /etc/rancher/k3s/config.yaml에 추가
 --kubelet-arg="eviction-hard=memory.available<100Mi,nodefs.available<5%,imagefs.available<5%"
 --kubelet-arg="eviction-soft=memory.available<200Mi,nodefs.available<10%"
 --kubelet-arg="eviction-soft-grace-period=memory.available=30s,nodefs.available=1m"
@@ -53,24 +40,6 @@ kubectl get pods -n apps -l app.kubernetes.io/name=postgresql -o custom-columns=
 
 ---
 
-## 5. 적용 과정에서 발견된 이슈 (참고)
-
-### ArgoCD Helm v4 + server-side apply 충돌
-- `configs.cm.accounts.ukkiee` 필드가 argocd-server에 의해 관리되어 Helm field manager 충돌 발생
-- **해결**: values.yaml에서 해당 필드 제거, argocd-server가 직접 관리하도록 위임
-- `manifests/infra/argocd/values.yaml`에 주석으로 기록됨
-
-### ArgoCD Helm chart의 deploymentStrategy 제한
-- `deploymentStrategy.type: Recreate` 설정 시 chart 기본 `rollingUpdate` 파라미터와 충돌
-- **해결**: ArgoCD values에서 deploymentStrategy 제거 (기본 RollingUpdate 유지)
-- 단일 노드 환경에서 RollingUpdate가 일시적으로 2x request를 사용하지만, ResourceQuota 여유분(x1.34)으로 대응
-
-### ResourceQuota 적용 순서 문제
-- ResourceQuota를 helm upgrade 전에 적용하면 기존 (높은) limit의 파드가 quota를 초과하여 새 파드 생성 차단
-- **해결**: ResourceQuota를 kustomization에서 주석 처리 → 모든 워크로드 리소스 조정 완료 후 재활성화
-
----
-
 ## 검증 PromQL (24h 데이터 축적 후)
 
 ```promql
@@ -80,9 +49,34 @@ max_over_time(container_memory_working_set_bytes{container!=""}[24h])
 # 파드별 24h 평균
 avg_over_time(container_memory_working_set_bytes{container!=""}[24h])
 
-# evictable 메모리 비율
-container_memory_cache / container_memory_usage_bytes
-
 # OOM 이벤트
 kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}
 ```
+
+---
+
+## 완료 항목
+
+| 항목 | 완료일 |
+|------|--------|
+| Phase 0: ArgoCD 드리프트 해소 + cadvisor scrape config | 2026-04-01 |
+| Phase 0: Reloader/PostgreSQL values Git 추적 | 2026-04-01 |
+| Phase 0: appset-controller 잔존 deploy 삭제 | 2026-04-01 |
+| Phase 1: 6개 워크로드 request 상향 | 2026-04-01 |
+| Phase 1: tailscale operator + ProxyClass BestEffort 해소 | 2026-04-01 |
+| Phase 1: CronJob 리소스 추가 | 2026-04-01 |
+| Phase 1: Reloader helm upgrade (경로 수정) | 2026-04-01 |
+| Phase 2: 10개 워크로드 req/lim 하향 (Git) | 2026-04-01 |
+| Phase 2: Traefik req/lim 하향 + Recreate | 2026-04-01 |
+| Phase 2: ArgoCD helm upgrade (revision 11) | 2026-04-01 |
+| Phase 2: image-updater req/lim 64/128→32/48Mi | 2026-04-01 |
+| Phase 3: PriorityClass 4개 적용 | 2026-04-01 |
+| Phase 3: LimitRange 8개 NS 적용 | 2026-04-01 |
+| Phase 3: 전체 워크로드 priorityClassName 추가 | 2026-04-01 |
+| Phase 3: ResourceQuota 8개 NS 재활성화 | 2026-04-01 |
+
+## 적용 과정에서 발견된 이슈
+
+- **Helm v4 field manager 충돌**: `configs.cm.accounts.ukkiee`를 values에서 제거, argocd-server 위임
+- **deploymentStrategy Recreate 제한**: ArgoCD chart가 rollingUpdate 파라미터와 충돌. values에서 제거
+- **ResourceQuota 적용 순서**: 기존 limit 초과로 파드 생성 차단 → helm upgrade 완료 후 재활성화
