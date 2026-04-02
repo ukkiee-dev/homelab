@@ -15,7 +15,7 @@ spec:
     stsPreload: true
     contentTypeNosniff: true
     browserXssFilter: true
-    frameDeny: true
+    customFrameOptionsValue: "SAMEORIGIN"
     referrerPolicy: "strict-origin-when-cross-origin"
     permissionsPolicy: "camera=(), microphone=(), geolocation=()"
     customResponseHeaders:

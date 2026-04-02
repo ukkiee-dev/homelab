@@ -120,18 +120,5 @@ jobs:
 
           git commit -m "chore: sync $APP config"
 
-          PUSHED=false
-          for i in 1 2 3; do
-            git rebase --abort 2>/dev/null || true
-            git pull --rebase origin main && git push && PUSHED=true && break || {
-              echo "push 실패 ($i/3), 재시도..."
-              sleep $((i * 5))
-            }
-          done
-
-          if [ "$PUSHED" != "true" ]; then
-            echo "::error::3회 retry 후에도 push 실패"
-            exit 1
-          fi
-
-          echo "매니페스트 갱신 완료"
+      - name: Push with retry
+        uses: ./.github/actions/git-push-retry

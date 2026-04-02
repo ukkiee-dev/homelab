@@ -1,0 +1,29 @@
+name: Git Push with Retry
+description: git pull --rebase + git push를 최대 3회 재시도
+
+inputs:
+  max_retries:
+    description: 최대 재시도 횟수
+    required: false
+    default: "3"
+
+runs:
+  using: composite
+  steps:
+    - name: Push with retry
+      shell: bash
+      run: |
+        PUSHED=false
+        MAX=${{ inputs.max_retries }}
+        for i in $(seq 1 $MAX); do
+          git rebase --abort 2>/dev/null || true
+          git pull --rebase origin main && git push && PUSHED=true && break || {
+            echo "⚠️  push 실패 ($i/$MAX), 재시도..."
+            sleep $((i * 5))
+          }
+        done
+
+        if [ "$PUSHED" != "true" ]; then
+          echo "❌ ${MAX}회 retry 후에도 push 실패"
+          exit 1
+        fi
