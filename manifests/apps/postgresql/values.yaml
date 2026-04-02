@@ -1,0 +1,20 @@
+# PostgreSQL Helm Values (custom overrides only)
+# Chart: bitnami/postgresql
+# Full chart defaults: https://github.com/bitnami/charts/tree/main/bitnami/postgresql
+
+auth:
+  database: api
+  username: api
+  existingSecret: postgresql-auth
+
+primary:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 48Mi
+    limits:
+      cpu: 300m
+      memory: 96Mi
+  persistence:
+    enabled: true
+    size: 5Gi
