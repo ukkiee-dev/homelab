@@ -11,7 +11,7 @@ spec:
   sourceRepos:
     - "https://github.com/ukkiee-dev/homelab.git"
     - "ghcr.io/ukkiee-dev/*"
-    - "oci://registry-1.docker.io/bitnamicharts"
+    - "registry-1.docker.io/bitnamicharts"
   destinations:
     - namespace: apps
       server: https://kubernetes.default.svc
