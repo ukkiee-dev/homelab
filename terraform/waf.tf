@@ -16,6 +16,9 @@ resource "cloudflare_ruleset" "waf_custom_rules" {
     action_parameters {
       ruleset = "current"
     }
+    logging {
+      enabled = true
+    }
     enabled = true
   }
 
@@ -89,7 +92,7 @@ resource "cloudflare_ruleset" "rate_limiting" {
     EOT
     action      = "block"
     ratelimit {
-      characteristics     = ["ip.src"]
+      characteristics     = ["cf.colo.id", "ip.src"]
       period              = 10
       requests_per_period = 20
       mitigation_timeout  = 10

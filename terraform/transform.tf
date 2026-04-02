@@ -10,9 +10,19 @@ resource "cloudflare_ruleset" "security_headers" {
   rules {
     ref         = "add_security_headers"
     description = "Add security headers to all responses"
-    expression  = "(true)"
+    expression  = "true"
     action      = "rewrite"
     action_parameters {
+      headers {
+        name      = "Permissions-Policy"
+        operation = "set"
+        value     = "camera=(), microphone=(), geolocation=()"
+      }
+      headers {
+        name      = "Referrer-Policy"
+        operation = "set"
+        value     = "strict-origin-when-cross-origin"
+      }
       headers {
         name      = "X-Content-Type-Options"
         operation = "set"
@@ -22,16 +32,6 @@ resource "cloudflare_ruleset" "security_headers" {
         name      = "X-Frame-Options"
         operation = "set"
         value     = "SAMEORIGIN"
-      }
-      headers {
-        name      = "Referrer-Policy"
-        operation = "set"
-        value     = "strict-origin-when-cross-origin"
-      }
-      headers {
-        name      = "Permissions-Policy"
-        operation = "set"
-        value     = "camera=(), microphone=(), geolocation=()"
       }
     }
     enabled = true
