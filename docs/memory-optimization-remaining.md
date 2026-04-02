@@ -1,23 +1,7 @@
-# K8s 메모리 최적화 — 남은 작업
+# K8s 메모리 최적화 — 전체 완료
 
 > 최종 업데이트: 2026-04-02
-> 완료: Phase 0~3 전체 + PostgreSQL helm upgrade
-
----
-
-## 1. kubelet eviction threshold (Phase 4)
-
-**방안 A**: K3s kubelet arg 설정 (OrbStack 지원 시)
-```bash
---kubelet-arg="eviction-hard=memory.available<100Mi,nodefs.available<5%,imagefs.available<5%"
---kubelet-arg="eviction-soft=memory.available<200Mi,nodefs.available<10%"
---kubelet-arg="eviction-soft-grace-period=memory.available=30s,nodefs.available=1m"
-```
-
-**방안 B**: OrbStack에서 kubelet 설정 불가 시
-1. PriorityClass + ResourceQuota만으로 보호 (이미 적용됨)
-2. OrbStack VM 메모리 증설: 12Gi → 16Gi
-3. Grafana 알람: `node_memory_MemAvailable_bytes < 500Mi` 시 알림
+> **Phase 0~4 전체 완료** — 남은 작업 없음
 
 ---
 
@@ -41,9 +25,31 @@
 | Phase 3: LimitRange 8개 NS 적용 | 2026-04-01 |
 | Phase 3: 전체 워크로드 priorityClassName 추가 | 2026-04-01 |
 | Phase 3: ResourceQuota 8개 NS 재활성화 | 2026-04-01 |
+| Phase 4: kubelet eviction threshold (OrbStack Settings UI) | 2026-04-02 |
+
+## Phase 4 설정 내역
+
+OrbStack Settings > Kubernetes > "Kubelet Configuration"에 적용:
+
+```yaml
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+evictionHard:
+  memory.available: "100Mi"
+  nodefs.available: "5%"
+  imagefs.available: "5%"
+evictionSoft:
+  memory.available: "200Mi"
+  nodefs.available: "10%"
+evictionSoftGracePeriod:
+  memory.available: "30s"
+  nodefs.available: "1m"
+evictionPressureTransitionPeriod: "30s"
+```
 
 ## 적용 과정에서 발견된 이슈
 
 - **Helm v4 field manager 충돌**: `configs.cm.accounts.ukkiee`를 values에서 제거, argocd-server 위임
 - **deploymentStrategy Recreate 제한**: ArgoCD chart가 rollingUpdate 파라미터와 충돌. values에서 제거
 - **ResourceQuota 적용 순서**: 기존 limit 초과로 파드 생성 차단 → helm upgrade 완료 후 재활성화
+- **OrbStack kubelet config**: v2.0.1+에서 Settings UI 지원. plist 직접 수정은 불가(앱이 인식하지 않음), GUI 필수
