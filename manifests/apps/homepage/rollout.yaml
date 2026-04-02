@@ -56,11 +56,6 @@ spec:
                 secretKeyRef:
                   name: apps-secrets
                   key: ADGUARD_PASSWORD
-            - name: HOMEPAGE_VAR_IMMICH_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: apps-secrets
-                  key: IMMICH_API_KEY
           volumeMounts:
             - name: config
               mountPath: /app/config

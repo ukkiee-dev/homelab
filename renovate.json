@@ -34,12 +34,6 @@
       "groupName": "cicd"
     },
     {
-      "description": "Immich - manual merge only (breaking changes frequent)",
-      "matchPackagePatterns": ["immich"],
-      "automerge": false,
-      "labels": ["critical", "dependencies"]
-    },
-    {
       "description": "Group monitoring updates",
       "matchPackagePatterns": ["prometheus", "grafana", "loki", "promtail", "alertmanager", "restic", "victoriametrics", "kube-state-metrics"],
       "groupName": "monitoring"

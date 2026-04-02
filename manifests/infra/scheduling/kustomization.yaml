@@ -3,7 +3,6 @@ kind: Kustomization
 
 resources:
   - priority-classes.yaml
-  - limitrange-immich.yaml
   - limitrange-argocd.yaml
   - limitrange-monitoring.yaml
   - limitrange-apps.yaml
@@ -11,7 +10,6 @@ resources:
   - limitrange-traefik-system.yaml
   - limitrange-networking.yaml
   - limitrange-test-web.yaml
-  - resourcequota-immich.yaml
   - resourcequota-argocd.yaml
   - resourcequota-monitoring.yaml
   - resourcequota-apps.yaml

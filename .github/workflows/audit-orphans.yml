@@ -32,7 +32,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           # 외부 이미지 앱 — 앱 레포가 없는 것이 정상인 앱 목록
-          EXCLUDE_LIST: "immich,postgresql"
+          EXCLUDE_LIST: "postgresql"
         run: |
           set -euo pipefail
 

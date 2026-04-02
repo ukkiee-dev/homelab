@@ -43,15 +43,6 @@ data:
 
   services.yaml: |
     - Services:
-        - Immich:
-            icon: immich.png
-            href: https://photos.ukkiee.dev
-            description: Photo & Video Backup
-            widget:
-              type: immich
-              url: http://immich-server.immich:2283
-              key: "{{HOMEPAGE_VAR_IMMICH_API_KEY}}"
-              version: 2
         - Uptime Kuma:
             icon: uptime-kuma.png
             href: https://status.ukkiee.dev

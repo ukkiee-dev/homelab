@@ -7,14 +7,13 @@ metadata:
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
-  description: User applications (immich, adguard, homepage, uptime-kuma, postgresql, test-web)
+  description: User applications (adguard, homepage, uptime-kuma, postgresql, test-web)
   sourceRepos:
     - "https://github.com/ukkiee-dev/homelab.git"
     - "ghcr.io/ukkiee-dev/*"
   destinations:
     - namespace: apps
       server: https://kubernetes.default.svc
-    - namespace: immich
       server: https://kubernetes.default.svc
     - namespace: test-web
       server: https://kubernetes.default.svc
