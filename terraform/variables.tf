@@ -1,5 +1,5 @@
 variable "cloudflare_api_token" {
-  description = "Cloudflare API Token (Zone:DNS Edit + Tunnel Edit)"
+  description = "Cloudflare API Token (Zone:DNS Edit, Firewall Services Edit, Tunnel Edit)"
   sensitive   = true
 }
 
@@ -19,4 +19,10 @@ variable "account_id" {
 variable "domain" {
   description = "Base domain for apps"
   default     = "ukkiee.dev"
+}
+
+variable "trusted_ip" {
+  description = "Trusted IP address for WAF allow rule (optional)"
+  type        = string
+  default     = ""
 }
