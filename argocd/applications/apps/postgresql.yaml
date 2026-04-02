@@ -12,9 +12,9 @@ metadata:
 spec:
   project: apps
   sources:
-    # Helm chart (OCI)
+    # Helm chart
     - chart: postgresql
-      repoURL: registry-1.docker.io/bitnamicharts
+      repoURL: https://charts.bitnami.com/bitnami
       targetRevision: "18.*"
       helm:
         valueFiles:
