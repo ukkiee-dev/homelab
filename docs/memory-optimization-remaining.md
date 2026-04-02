@@ -1,30 +1,11 @@
 # K8s 메모리 최적화 — 남은 작업
 
-> 최종 업데이트: 2026-04-01
-> 완료: Phase 0~3 + ResourceQuota 재활성화 + image-updater 조정
+> 최종 업데이트: 2026-04-02
+> 완료: Phase 0~3 전체 + PostgreSQL helm upgrade
 
 ---
 
-## 1. PostgreSQL helm upgrade (Phase 2.5)
-
-**전제조건**: cadvisor 24h 피크 데이터 확보 후 (scrape config 2026-04-01 추가, 2026-04-02 이후 실행 가능)
-
-```bash
-# 실행 전 24h 피크 확인
-# max_over_time(container_memory_working_set_bytes{container="postgresql", namespace="apps"}[24h])
-
-helm upgrade postgresql oci://registry-1.docker.io/bitnamicharts/postgresql -n apps \
-  --reuse-values \
-  --set primary.resources.requests.memory=48Mi \
-  --set primary.resources.limits.memory=96Mi
-
-# 변경된 values Git에 업데이트
-helm get values -a postgresql -n apps > manifests/apps/postgresql/helm-values.yaml
-```
-
----
-
-## 2. kubelet eviction threshold (Phase 4)
+## 1. kubelet eviction threshold (Phase 4)
 
 **방안 A**: K3s kubelet arg 설정 (OrbStack 지원 시)
 ```bash
@@ -37,21 +18,6 @@ helm get values -a postgresql -n apps > manifests/apps/postgresql/helm-values.ya
 1. PriorityClass + ResourceQuota만으로 보호 (이미 적용됨)
 2. OrbStack VM 메모리 증설: 12Gi → 16Gi
 3. Grafana 알람: `node_memory_MemAvailable_bytes < 500Mi` 시 알림
-
----
-
-## 검증 PromQL (24h 데이터 축적 후)
-
-```promql
-# 파드별 24h 피크
-max_over_time(container_memory_working_set_bytes{container!=""}[24h])
-
-# 파드별 24h 평균
-avg_over_time(container_memory_working_set_bytes{container!=""}[24h])
-
-# OOM 이벤트
-kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}
-```
 
 ---
 
@@ -70,6 +36,7 @@ kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}
 | Phase 2: Traefik req/lim 하향 + Recreate | 2026-04-01 |
 | Phase 2: ArgoCD helm upgrade (revision 11) | 2026-04-01 |
 | Phase 2: image-updater req/lim 64/128→32/48Mi | 2026-04-01 |
+| Phase 2: PostgreSQL helm upgrade (24h 피크 46.2Mi 확인, req/lim 48/96Mi) | 2026-04-02 |
 | Phase 3: PriorityClass 4개 적용 | 2026-04-01 |
 | Phase 3: LimitRange 8개 NS 적용 | 2026-04-01 |
 | Phase 3: 전체 워크로드 priorityClassName 추가 | 2026-04-01 |
