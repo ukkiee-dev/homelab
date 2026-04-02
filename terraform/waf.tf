@@ -11,7 +11,7 @@ resource "cloudflare_ruleset" "waf_custom_rules" {
   rules {
     ref         = "allow_verified_bots"
     description = "Allow verified bots and trusted IP"
-    expression  = var.trusted_ip != "" ? "(cf.client.bot) or (ip.src eq ${var.trusted_ip})" : "(cf.client.bot)"
+    expression  = var.trusted_ip != "" ? "(cf.client.bot) or (ip.src in {${var.trusted_ip}})" : "(cf.client.bot)"
     action      = "skip"
     action_parameters {
       ruleset = "current"

@@ -1,5 +1,5 @@
 variable "cloudflare_api_token" {
-  description = "Cloudflare API Token (Zone:DNS Edit, Firewall Services Edit, Tunnel Edit)"
+  description = "Cloudflare API Token (Zone: DNS Edit, Zone WAF Edit, Cache Rules Edit, Transform Rules Edit, Account: Cloudflare Tunnel Edit)"
   sensitive   = true
 }
 
@@ -22,7 +22,7 @@ variable "domain" {
 }
 
 variable "trusted_ip" {
-  description = "Trusted IP address for WAF allow rule (optional)"
+  description = "Trusted IP/CIDR for WAF allow rule (e.g. 1.2.3.4 or 1.2.3.0/24, optional)"
   type        = string
   default     = ""
 }
