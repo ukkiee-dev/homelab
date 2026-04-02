@@ -19,22 +19,23 @@ githubConfigSecret:
 
 runnerGroup: "ukkiee"
 
-maxRunners: 3
+maxRunners: 1
 minRunners: 0
 
 template:
   spec:
+    priorityClassName: batch-low
     containers:
       - name: runner
         image: ghcr.io/actions/actions-runner:2.333.0
         command: ["/home/runner/run.sh"]
         resources:
           requests:
-            cpu: "1"
-            memory: 2Gi
+            cpu: 500m
+            memory: 1Gi
           limits:
-            cpu: "4"
-            memory: 4Gi
+            cpu: "2"
+            memory: 2Gi
 
 containerMode:
   type: "dind"  # Docker-in-Docker

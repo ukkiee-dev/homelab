@@ -19,3 +19,4 @@ resources:
   - resourcequota-traefik-system.yaml
   - resourcequota-networking.yaml
   - resourcequota-test-web.yaml
+  - resourcequota-actions-runner-system.yaml

@@ -5,6 +5,10 @@ on:
     - cron: "0 0 * * 1" # 매주 월요일 09:00 KST (00:00 UTC)
   workflow_dispatch: # 수동 실행 가능
 
+
+permissions:
+  contents: read
+
 jobs:
   audit:
     runs-on: ubuntu-latest

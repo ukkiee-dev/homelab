@@ -1,0 +1,87 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: immich-prune
+  labels:
+    app.kubernetes.io/name: immich-prune
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  schedule: "0 19 * * 0"  # 매주 일요일 04:00 KST (UTC 19:00)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          priorityClassName: batch-low
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: false
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: restic
+              image: restic/restic:0.17.3
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              command:
+                - sh
+                - -c
+                - |
+                  echo "=== Restic prune started at $(date) ==="
+
+                  # 로컬 repo prune
+                  echo "--- Local repo prune ---"
+                  restic -r /backups/restic forget \
+                    --keep-daily 7 --keep-weekly 4 --keep-monthly 6 \
+                    --prune
+
+                  # R2 repo prune
+                  echo "--- R2 repo prune ---"
+                  restic -r s3:${R2_ENDPOINT}/${R2_BUCKET} forget \
+                    --keep-daily 7 --keep-weekly 4 --keep-monthly 6 \
+                    --prune
+
+                  echo "=== Restic prune completed at $(date) ==="
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: immich-secrets
+                      key: R2_ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: immich-secrets
+                      key: R2_SECRET_ACCESS_KEY
+                - name: RESTIC_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: immich-secrets
+                      key: RESTIC_PASSWORD
+                - name: R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: immich-secrets
+                      key: R2_ENDPOINT
+                - name: R2_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: immich-secrets
+                      key: R2_BUCKET
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: immich-backup

@@ -80,11 +80,6 @@ spec:
                     --exclude="profile" \
                     --tag immich
 
-                  # 로컬 repo 보존 정책
-                  restic -r /backups/restic forget \
-                    --keep-daily 7 --keep-weekly 4 --keep-monthly 6 \
-                    --prune
-
                   # R2 repo 백업
                   echo "--- R2 repo backup ---"
                   restic -r s3:${R2_ENDPOINT}/${R2_BUCKET} backup \
@@ -95,11 +90,6 @@ spec:
                     --exclude="upload" \
                     --exclude="profile" \
                     --tag immich
-
-                  # R2 repo 보존 정책
-                  restic -r s3:${R2_ENDPOINT}/${R2_BUCKET} forget \
-                    --keep-daily 7 --keep-weekly 4 --keep-monthly 6 \
-                    --prune
 
                   echo "=== Restic backup completed at $(date) ==="
               env:

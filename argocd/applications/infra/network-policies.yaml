@@ -15,7 +15,6 @@ spec:
     path: manifests/infra/network-policies
   destination:
     server: https://kubernetes.default.svc
-    namespace: apps
   syncPolicy:
     automated:
       selfHeal: true

@@ -24,6 +24,10 @@ on:
       APP_PRIVATE_KEY:
         required: true
 
+
+permissions:
+  contents: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest

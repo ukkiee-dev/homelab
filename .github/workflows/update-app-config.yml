@@ -23,6 +23,10 @@ concurrency:
   group: homelab-manifest-update
   cancel-in-progress: false
 
+
+permissions:
+  contents: write
+
 jobs:
   update:
     runs-on: ubuntu-latest

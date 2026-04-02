@@ -28,6 +28,11 @@ on:
       ARGOCD_AUTH_TOKEN:
         required: true
 
+
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   teardown:
     runs-on: ubuntu-latest

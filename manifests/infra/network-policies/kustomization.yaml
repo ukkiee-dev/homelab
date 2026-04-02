@@ -10,3 +10,6 @@ resources:
   - apps-allow-tailscale-proxy.yaml
   - traefik-default-deny.yaml
   - networking-default-deny.yaml
+  - monitoring-default-deny.yaml
+  - monitoring-allow-traefik.yaml
+  - monitoring-allow-internal.yaml

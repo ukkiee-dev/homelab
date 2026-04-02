@@ -29,6 +29,11 @@ spec:
       containers:
         - name: grafana
           image: grafana/grafana:12.0.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 3000
