@@ -31,7 +31,8 @@ GitHub Actions
 | GitOps | ArgoCD (self-heal, auto-sync) |
 | Ingress | Traefik v3 + Cloudflare DNS ACME |
 | Tunnel | Cloudflared (public), Tailscale (internal) |
-| DNS/IaC | Terraform + Cloudflare Provider (R2 state backend) |
+| DNS/IaC | Terraform + Cloudflare Provider v4 (R2 state backend) |
+| Edge Security | Cloudflare WAF + Cache Rules + Security Headers |
 | Secrets | Sealed Secrets (Bitnami) |
 | Monitoring | VictoriaMetrics + VictoriaLogs + Grafana + Alloy |
 | CI/CD | ARC (Actions Runner Controller) + GitHub Actions |
@@ -75,6 +76,9 @@ GitHub Actions
 ├── terraform/
 │   ├── apps.json                # 앱 레지스트리 (서브도메인 매핑)
 │   ├── dns.tf                   # Cloudflare CNAME 레코드
+│   ├── waf.tf                   # WAF Custom Rules (5) + Rate Limiting (1)
+│   ├── cache.tf                 # Cache Rules (정적 자산, API bypass)
+│   ├── transform.tf             # Security response headers
 │   ├── backend.tf               # R2 state storage
 │   ├── provider.tf              # Cloudflare provider
 │   └── variables.tf             # Input variables
@@ -141,10 +145,15 @@ GitHub Actions
 **Internal** (Tailscale-only): `home`, `api`, `dns`, `status`, `argo`, `traefik` (all `*.ukkiee.dev`)
 
 **Security**:
+- Cloudflare WAF: 5 custom rules (verified bot allow, geo challenge, threat score, malicious UA block, sensitive path block)
+- Cloudflare Rate Limiting: login/auth path IP-based rate limit
+- Security response headers: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
+- HSTS enabled (max-age 6 months, includeSubDomains)
+- Bot protection: AI bot blocking, AI Labyrinth
 - Default-deny NetworkPolicy in apps namespace
 - Traefik middlewares: security headers, rate limiting (50 req/min), gzip
 - Tailscale IP allowlist (`100.64.0.0/10`)
-- TLS via Let's Encrypt + Cloudflare DNS challenge
+- TLS via Let's Encrypt + Cloudflare DNS challenge (Full Strict mode)
 
 ## Automation
 
