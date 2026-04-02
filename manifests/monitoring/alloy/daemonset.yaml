@@ -55,6 +55,8 @@ spec:
             - name: docker-containers
               mountPath: /var/lib/docker/containers
               readOnly: true
+            - name: data
+              mountPath: /data-alloy
       volumes:
         - name: config
           configMap:
@@ -65,3 +67,5 @@ spec:
         - name: docker-containers
           hostPath:
             path: /var/lib/docker/containers
+        - name: data
+          emptyDir: {}
