@@ -17,10 +17,11 @@ data:
           - uid: telegram
             type: telegram
             settings:
-              bottoken: $TELEGRAM_BOT_TOKEN
-              chatid: "8001733025"
               parse_mode: HTML
               disable_web_page_preview: true
+            secureSettings:
+              bottoken: $TELEGRAM_BOT_TOKEN
+              chatid: $TELEGRAM_CHAT_ID
               message: |
                 {{ if .Alerts.Firing }}🚨 <b>장애 발생</b> ({{ .Alerts.Firing | len }}건){{ range .Alerts.Firing }}
                 ⚠️ <b>{{ .Labels.alertname }}</b>
