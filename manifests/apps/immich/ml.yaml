@@ -45,10 +45,10 @@ spec:
           resources:
             requests:
               cpu: 200m
-              memory: 256Mi
+              memory: 384Mi
             limits:
               cpu: "2"
-              memory: 384Mi
+              memory: 768Mi
           startupProbe:
             httpGet:
               path: /ping

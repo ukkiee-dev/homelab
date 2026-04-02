@@ -20,9 +20,13 @@ spec:
         spec:
           priorityClassName: batch-low
           restartPolicy: Never
+          securityContext:
+            runAsNonRoot: false
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: pgdump
-              image: bitnami/postgresql:latest
+              image: bitnami/postgresql:18.3.0
               resources:
                 requests:
                   cpu: 25m

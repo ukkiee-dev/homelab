@@ -17,6 +17,8 @@ spec:
       kind: Rule
       priority: 100
       middlewares:
+        - name: tailscale-only
+          namespace: traefik-system
         - name: security-headers
           namespace: traefik-system
       services:

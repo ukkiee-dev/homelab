@@ -6,6 +6,8 @@ namespace: argocd
 resources:
   - namespace.yaml
   - appproject-infra.yaml
+  - appproject-apps.yaml
+  - appproject-monitoring.yaml
   - ingressroute.yaml
   - ingressroute-api.yaml
   - image-updater.yaml

@@ -19,6 +19,10 @@ spec:
         spec:
           priorityClassName: batch-low
           restartPolicy: Never
+          securityContext:
+            runAsNonRoot: false
+            seccompProfile:
+              type: RuntimeDefault
           initContainers:
             # Step 1: pg_dump (완료 후에만 restic 실행)
             - name: pgdump

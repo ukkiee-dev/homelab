@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: apps
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  description: User applications (immich, adguard, homepage, uptime-kuma, postgresql, test-web)
+  sourceRepos:
+    - "https://github.com/ukkiee-dev/homelab.git"
+    - "ghcr.io/ukkiee-dev/*"
+  destinations:
+    - namespace: apps
+      server: https://kubernetes.default.svc
+    - namespace: immich
+      server: https://kubernetes.default.svc
+    - namespace: test-web
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: scheduling.k8s.io
+      kind: PriorityClass

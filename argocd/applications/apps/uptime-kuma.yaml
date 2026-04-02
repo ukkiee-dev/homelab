@@ -9,11 +9,11 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/name: uptime-kuma
-    app.kubernetes.io/component: proxy
+    app.kubernetes.io/component: monitoring
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
-  project: default
+  project: apps
   source:
     repoURL: https://github.com/ukkiee-dev/homelab.git
     targetRevision: main
