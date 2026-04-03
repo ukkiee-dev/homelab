@@ -30,26 +30,32 @@
 | **결과**: PostgreSQL 약 10분 다운타임 발생 | ❌ |
 | `helm install` 로 복구 | ✅ 정상 복구 |
 
-### 실패 원인 분석
+### 실패 원인 분석 (리서치 결과 반영)
 
-1. **Docker Hub OCI 인증**: ArgoCD가 anonymous로 tags API 호출 → 403 Forbidden. Docker Hub rate limiting 또는 인증 필요.
-2. **HTTPS Bitnami repo**: 리다이렉트(`charts.bitnami.com` → `repo.broadcom.com`) 경유. repo-server가 26MB index.yaml을 다운받다 OOM 가능성.
-3. **repo-server 불안정**: limit 192Mi에서 Helm chart render + GPG 키 생성으로 OOM 반복.
-4. **ArgoCD 캐시**: repo-server 재시작 후에도 이전 IP/에러가 캐시되어 connection refused 지속.
+1. **Docker Hub OCI 인증 (확인됨)**: Docker Hub는 public repo라도 `/v2/.../tags/list` API에 인증 토큰을 요구한다. ArgoCD repo-server가 anonymous로 호출하므로 403 Forbidden 발생. `repoURL`에 `oci://` prefix를 쓰면 안 되며, helm-type credential Secret이 필수. (argoproj/argo-cd#25513 — 문서 이슈, v3.3.0에서 clarified)
+2. **Bitnami index.yaml OOM (확인됨)**: `charts.bitnami.com` → `repo.broadcom.com` 302 리다이렉트. index.yaml이 **25.4MB**이며, Go YAML 파서가 원본의 15~25배(375~625MB) 메모리를 소비한다. repo-server limit 192Mi에서 절대 불가. (argoproj/argo-cd#23402, bitnami/charts#27091)
+3. **클러스터 전역 교착 (사후 발견)**: Git revert 후에도 **라이브 Application이 multi-source 상태로 고착**. repo-server가 Bitnami index 로드 시마다 OOM → root App이 Git 변경을 sync할 수 없는 deadlock 발생. repo-server 38회 재시작, **전체 ArgoCD Application이 Unknown 상태**로 전이됨. `kubectl patch`로 라이브 Application을 수동 수정하여 해결.
+4. **ArgoCD gRPC 캐시**: repo-server IP 변경 후 controller가 stale IP(192.168.194.191)로 연결 시도 → connection refused. `argocd.argoproj.io/refresh=hard` 또는 controller 재시작으로 해결.
 
 ### 재시도 시 사전 조건
 
-1. repo-server limit **최소 384Mi** 이상으로 상향
-2. Docker Hub 인증 설정 (ArgoCD repository credentials)
-3. 또는 GitHub Container Registry에 Helm chart를 mirror하여 OCI 인증 문제 회피
+1. repo-server limit **최소 512Mi, 권장 768Mi** + `--parallelismlimit 2` 설정
+2. Docker Hub 인증 Secret 생성 (`argocd.argoproj.io/secret-type: repository`, `enableOCI: "true"`)
+3. **또는 OCI 방식 사용** — index.yaml 다운로드를 완전히 회피 (repo-server OOM 근본 해결)
 4. 전환 시 **Helm release를 uninstall하지 않고** ArgoCD가 ServerSideApply로 adopt하는 방식 시도
-5. 다운타임 최소화를 위해 **새 Application을 먼저 sync한 후** Helm release 삭제
+5. 실패 시 rollback: `kubectl patch`로 라이브 Application을 즉시 single-source로 복원할 수 있도록 준비
+
+### 교훈
+
+- **ArgoCD Application의 source 변경은 양날의 검**: sync 실패 시 Git revert만으로는 복구 불가능 (교착)
+- **수동 개입 준비 필수**: `kubectl patch app` 명령을 사전에 준비해두어야 함
+- **repo-server OOM은 전역 장애**: 하나의 Application이 거대한 Helm index를 참조하면 전체 클러스터의 GitOps가 마비됨
 
 ### 결론
 
 현재 환경(12Gi RAM, 단일 노드)에서는 **Helm 직접 관리가 더 안전하고 실용적**이다.
 helm upgrade는 분기 1~2회 수준이라 자동화 이점이 제한적이고,
-multi-source 전환의 위험(다운타임, OOM, 인증)이 이점을 초과한다.
+multi-source 전환의 위험(다운타임, OOM, 전역 교착)이 이점을 초과한다.
 
 ---
 
