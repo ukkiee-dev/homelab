@@ -21,3 +21,7 @@ spec:
       kind: Namespace
     - group: scheduling.k8s.io
       kind: PriorityClass
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
