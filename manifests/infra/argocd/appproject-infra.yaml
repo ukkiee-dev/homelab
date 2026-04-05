@@ -9,10 +9,42 @@ metadata:
 spec:
   description: Infrastructure components (sealed-secrets, traefik, tailscale-operator)
   sourceRepos:
-    - "*"
+    - "https://github.com/ukkiee-dev/homelab.git"
+    - "https://bitnami-labs.github.io/sealed-secrets"
+    - "https://traefik.github.io/charts"
+    - "https://pkgs.tailscale.com/helmcharts"
+    - "ghcr.io/actions/actions-runner-controller-charts"
   destinations:
-    - namespace: "*"
+    - namespace: kube-system
+      server: https://kubernetes.default.svc
+    - namespace: traefik-system
+      server: https://kubernetes.default.svc
+    - namespace: tailscale-system
+      server: https://kubernetes.default.svc
+    - namespace: networking
+      server: https://kubernetes.default.svc
+    - namespace: actions-runner-system
+      server: https://kubernetes.default.svc
+    - namespace: argocd
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
-    - group: "*"
-      kind: "*"
+    - group: ""
+      kind: Namespace
+    - group: ""
+      kind: ServiceAccount
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: scheduling.k8s.io
+      kind: PriorityClass
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: ""
+      kind: ResourceQuota
