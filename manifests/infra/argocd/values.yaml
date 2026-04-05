@@ -58,4 +58,4 @@ notifications:
   enabled: false
 
 applicationSet:
-  enabled: false
+  replicas: 0
