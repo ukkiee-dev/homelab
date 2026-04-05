@@ -58,8 +58,8 @@ spec:
               memory: "32Mi"
               cpu: "25m"
             limits:
-              memory: "48Mi"
-              cpu: "100m"
+              memory: "64Mi"
+              cpu: "200m"
           startupProbe:
             httpGet:
               path: /health
@@ -71,10 +71,12 @@ spec:
               path: /health
               port: http
             periodSeconds: 20
-            failureThreshold: 3
+            timeoutSeconds: 5
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /health
               port: http
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
