@@ -11,10 +11,11 @@ metadata:
 spec:
   schedule: "0 18 * * *"  # 03:00 KST
   concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 600
       backoffLimit: 1
       template:
         spec:
