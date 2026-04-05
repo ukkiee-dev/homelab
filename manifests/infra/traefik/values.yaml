@@ -89,13 +89,21 @@ priorityClassName: infra-critical
 updateStrategy:
   type: Recreate
 
+readinessProbe:
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+livenessProbe:
+  failureThreshold: 5
+  timeoutSeconds: 5
+
 resources:
   requests:
-    cpu: 50m
+    cpu: 100m
     memory: 48Mi
   limits:
-    cpu: 200m
-    memory: 96Mi
+    cpu: 400m
+    memory: 128Mi
 
 
 service:

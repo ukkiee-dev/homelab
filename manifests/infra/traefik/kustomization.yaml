@@ -7,3 +7,4 @@ resources:
   - namespace.yaml
   - middlewares.yaml
   - dashboard-ingressroute.yaml
+  - traefik-secret.sealed.yaml
