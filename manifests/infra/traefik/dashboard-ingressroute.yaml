@@ -16,8 +16,11 @@ spec:
       kind: Rule
       middlewares:
         - name: tailscale-only
+          namespace: traefik-system
         - name: security-headers
+          namespace: traefik-system
         - name: gzip
+          namespace: traefik-system
       services:
         - name: api@internal
           kind: TraefikService

@@ -16,7 +16,7 @@ spec:
     # Helm chart
     - chart: traefik
       repoURL: https://traefik.github.io/charts
-      targetRevision: "34.*"
+      targetRevision: "34.5.0"
       helm:
         valueFiles:
           - $values/manifests/infra/traefik/values.yaml
