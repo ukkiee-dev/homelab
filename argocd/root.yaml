@@ -22,7 +22,7 @@ spec:
   syncPolicy:
     automated:
       selfHeal: true
-      prune: true
+      prune: false
     retry:
       limit: 3
       backoff:

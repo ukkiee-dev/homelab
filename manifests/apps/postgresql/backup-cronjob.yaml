@@ -27,7 +27,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: pgdump
-              image: bitnami/postgresql:18.3.0
+              image: bitnami/postgresql:latest
               resources:
                 requests:
                   cpu: 25m
