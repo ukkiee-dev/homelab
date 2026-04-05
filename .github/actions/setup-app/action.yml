@@ -259,13 +259,67 @@ runs:
                       path: $HEALTH_PATH
                       port: http
                     periodSeconds: 20
-                    failureThreshold: 3
+                    timeoutSeconds: 5
+                    failureThreshold: 5
                   readinessProbe:
                     httpGet:
                       path: $HEALTH_PATH
                       port: http
                     periodSeconds: 10
+                    timeoutSeconds: 5
                     failureThreshold: 3
+        EOF
+        fi
+
+        # NetworkPolicy 생성 (default-deny + allow-traefik)
+        cat > _homelab/manifests/apps/$APP/networkpolicy.yaml << EOF
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: default-deny-all
+          namespace: $APP
+          labels:
+            app.kubernetes.io/name: $APP
+            app.kubernetes.io/component: networking
+            app.kubernetes.io/managed-by: argocd
+        spec:
+          podSelector: {}
+          policyTypes:
+            - Ingress
+            - Egress
+          egress:
+            - to: []
+              ports:
+                - protocol: UDP
+                  port: 53
+                - protocol: TCP
+                  port: 53
+        EOF
+
+        if [ "$TYPE" != "worker" ]; then
+          cat >> _homelab/manifests/apps/$APP/networkpolicy.yaml << EOF
+        ---
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: allow-traefik-ingress
+          namespace: $APP
+          labels:
+            app.kubernetes.io/name: $APP
+            app.kubernetes.io/component: networking
+            app.kubernetes.io/managed-by: argocd
+        spec:
+          podSelector: {}
+          policyTypes:
+            - Ingress
+          ingress:
+            - from:
+                - namespaceSelector:
+                    matchLabels:
+                      kubernetes.io/metadata.name: traefik-system
+              ports:
+                - protocol: TCP
+                  port: $PORT
         EOF
         fi
 
@@ -277,6 +331,7 @@ runs:
         resources:
           - ghcr-pull-secret.sealed.yaml
           - deployment.yaml
+          - networkpolicy.yaml
         EOF
           # YAML 들여쓰기 정규화 (heredoc 8스페이스 제거)
           for f in _homelab/manifests/apps/$APP/*.yaml; do
@@ -341,6 +396,7 @@ runs:
           - deployment.yaml
           - service.yaml
           - ingressroute.yaml
+          - networkpolicy.yaml
         EOF
           # YAML 들여쓰기 정규화 (heredoc 8스페이스 제거)
           for f in _homelab/manifests/apps/$APP/*.yaml; do
