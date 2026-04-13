@@ -31,8 +31,8 @@ jobs:
         id: orphans
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          # 외부 이미지 앱 — 앱 레포가 없는 것이 정상인 앱 목록
-          EXCLUDE_LIST: "postgresql"
+          # 앱 레포가 없는 것이 정상인 앱 목록 (외부 이미지, infra 앱 등)
+          EXCLUDE_LIST: "postgresql,argocd"
         run: |
           set -euo pipefail
 
