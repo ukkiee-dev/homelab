@@ -19,24 +19,24 @@ TMPFILE_PUT=$(mktemp /tmp/tunnel-put-XXXXXX.json)
 trap 'rm -f "$TMPFILE" "$TMPFILE_PUT"' EXIT
 
 # 1. 현재 config 조회 + 검증
-echo "현재 tunnel config 조회..."
+echo "현재 tunnel config 조회..." >&2
 HTTP_CODE=$(curl -s -o "$TMPFILE" -w '%{http_code}' "${CURL_OPTS[@]}" \
   -H "Authorization: Bearer $CF_TOKEN" "$API_URL") || {
-  echo "API 연결 실패"; exit 1
+  echo "API 연결 실패" >&2; exit 1
 }
 BODY=$(cat "$TMPFILE")
 
 if [ "$HTTP_CODE" != "200" ]; then
-  echo "API 응답 HTTP $HTTP_CODE: $BODY"; exit 1
+  echo "API 응답 HTTP $HTTP_CODE: $BODY" >&2; exit 1
 fi
 
 CONFIG=$(echo "$BODY" | jq -e '.result.config') || {
-  echo "config 파싱 실패: $BODY"; exit 1
+  echo "config 파싱 실패: $BODY" >&2; exit 1
 }
 
 RULE_COUNT=$(echo "$CONFIG" | jq '.ingress | length')
 if [ "$RULE_COUNT" -lt 1 ]; then
-  echo "ingress가 비어있음 — 비정상 상태"; exit 1
+  echo "ingress가 비어있음 — 비정상 상태" >&2; exit 1
 fi
 
 # list 액션
@@ -55,8 +55,8 @@ CATCHALL=$(echo "$CONFIG" | jq '.ingress[-1]')
 # catch-all 검증: 마지막 rule에 hostname이 있으면 비정상
 CATCHALL_HAS_HOSTNAME=$(echo "$CATCHALL" | jq 'has("hostname")')
 if [ "$CATCHALL_HAS_HOSTNAME" = "true" ]; then
-  echo "마지막 ingress rule에 hostname이 있음 — catch-all 누락"
-  echo "현재 config: $(echo "$CONFIG" | jq -c '.ingress')"
+  echo "마지막 ingress rule에 hostname이 있음 — catch-all 누락" >&2
+  echo "현재 config: $(echo "$CONFIG" | jq -c '.ingress')" >&2
   exit 1
 fi
 
@@ -67,10 +67,10 @@ case "$ACTION" in
     EXISTING_SERVICE=$(echo "$RULES" | jq -r --arg h "$HOSTNAME" \
       '[.[] | select(.hostname == $h)][0].service // empty')
     if [ "$EXISTING_SERVICE" = "$SERVICE" ]; then
-      echo "$HOSTNAME 이미 동일한 service로 존재, 스킵"
+      echo "$HOSTNAME 이미 동일한 service로 존재, 스킵" >&2
       exit 0
     elif [ -n "$EXISTING_SERVICE" ]; then
-      echo "$HOSTNAME service 변경: $EXISTING_SERVICE -> $SERVICE"
+      echo "$HOSTNAME service 변경: $EXISTING_SERVICE -> $SERVICE" >&2
       RULES=$(echo "$RULES" | jq --arg h "$HOSTNAME" '[.[] | select(.hostname != $h)]')
     fi
     NEW_RULE=$(jq -n --arg h "$HOSTNAME" --arg s "$SERVICE" '{hostname: $h, service: $s}')
@@ -79,18 +79,18 @@ case "$ACTION" in
   remove)
     EXISTING=$(echo "$RULES" | jq --arg h "$HOSTNAME" '[.[] | select(.hostname == $h)] | length')
     if [ "$EXISTING" -eq 0 ]; then
-      echo "$HOSTNAME 없음, 스킵"
+      echo "$HOSTNAME 없음, 스킵" >&2
       exit 0
     fi
     UPDATED=$(echo "$RULES" | jq --arg h "$HOSTNAME" '[.[] | select(.hostname != $h)]')
     ;;
   *)
-    echo "Unknown action: $ACTION (add|remove|list)"; exit 1
+    echo "Unknown action: $ACTION (add|remove|list)" >&2; exit 1
     ;;
 esac
 
 AFTER_COUNT=$(echo "$UPDATED" | jq 'length')
-echo "ingress rules: $BEFORE_COUNT -> $AFTER_COUNT"
+echo "ingress rules: $BEFORE_COUNT -> $AFTER_COUNT" >&2
 
 # catch-all 재추가 + 최종 config 조립
 FINAL_CONFIG=$(echo "$CONFIG" | jq --argjson rules "$UPDATED" --argjson catchall "$CATCHALL" \
@@ -98,13 +98,13 @@ FINAL_CONFIG=$(echo "$CONFIG" | jq --argjson rules "$UPDATED" --argjson catchall
 
 # dry-run
 if [ "${DRY_RUN:-false}" = "true" ]; then
-  echo "[DRY-RUN] 변경될 config:"
-  echo "$FINAL_CONFIG" | jq .
+  echo "[DRY-RUN] 변경될 config:" >&2
+  echo "$FINAL_CONFIG" | jq . >&2
   exit 0
 fi
 
 # 2. config 업데이트 — payload를 jq로 안전하게 조립 (셸 문자열 보간 미사용)
-echo "tunnel config 업데이트..."
+echo "tunnel config 업데이트..." >&2
 PAYLOAD=$(jq -n --argjson config "$FINAL_CONFIG" '{config: $config}')
 
 PUT_CODE=$(curl -s -o "$TMPFILE_PUT" -w '%{http_code}' "${CURL_OPTS[@]}" \
@@ -112,16 +112,16 @@ PUT_CODE=$(curl -s -o "$TMPFILE_PUT" -w '%{http_code}' "${CURL_OPTS[@]}" \
   -H "Authorization: Bearer $CF_TOKEN" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD") || {
-  echo "PUT 요청 실패"; exit 1
+  echo "PUT 요청 실패" >&2; exit 1
 }
 PUT_BODY=$(cat "$TMPFILE_PUT")
 
 if [ "$PUT_CODE" = "200" ] && echo "$PUT_BODY" | jq -e '.success' > /dev/null; then
   if [ -n "${EXISTING_SERVICE:-}" ] && [ "$EXISTING_SERVICE" != "$SERVICE" ]; then
-    echo "update 완료: $HOSTNAME ($EXISTING_SERVICE -> $SERVICE)"
+    echo "update 완료: $HOSTNAME ($EXISTING_SERVICE -> $SERVICE)" >&2
   else
-    echo "$ACTION 완료: $HOSTNAME"
+    echo "$ACTION 완료: $HOSTNAME" >&2
   fi
 else
-  echo "업데이트 실패 (HTTP $PUT_CODE): $PUT_BODY"; exit 1
+  echo "업데이트 실패 (HTTP $PUT_CODE): $PUT_BODY" >&2; exit 1
 fi
