@@ -40,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           POSTGRES_TAG=$(grep -E '^FROM postgres:' docker/postgres-backup/Dockerfile | awk -F: '{print $2}')
-          RCLONE_VERSION=$(grep -E '^ARG RCLONE_VERSION=' docker/postgres-backup/Dockerfile | cut -d= -f2)
+          RCLONE_VERSION=$(grep -E '^ARG RCLONE_V=' docker/postgres-backup/Dockerfile | cut -d= -f2)
           echo "postgres_tag=${POSTGRES_TAG}" >> "$GITHUB_OUTPUT"
           echo "rclone_version=${RCLONE_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Postgres tag:  ${POSTGRES_TAG}"
