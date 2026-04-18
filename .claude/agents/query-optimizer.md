@@ -67,7 +67,7 @@ sum(rate(http_requests_total{namespace="$ns"}[5m])) by (status_code)
 {namespace="apps"} AND _msg:~"error|Error|ERROR"
 
 # 특정 Pod 로그
-{namespace="immich", pod=~"immich-server.*"}
+{namespace="apps", pod=~"adguard.*"}
 
 # 시간 범위 + 키워드
 {namespace="monitoring"} AND _msg:"connection refused" | _time:1h

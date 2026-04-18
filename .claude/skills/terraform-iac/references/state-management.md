@@ -80,8 +80,8 @@ terraform state list
 
 예상 출력:
 ```
-cloudflare_record.apps["immich"]
-cloudflare_record.apps["test-app"]
+cloudflare_record.apps["argocd"]
+cloudflare_record.apps["test-web"]
 ```
 
 apps.json의 키 수와 state list의 리소스 수가 일치해야 함.
@@ -89,7 +89,7 @@ apps.json의 키 수와 state list의 리소스 수가 일치해야 함.
 ### 2. 개별 리소스 상세
 
 ```bash
-terraform state show 'cloudflare_record.apps["immich"]'
+terraform state show 'cloudflare_record.apps["argocd"]'
 ```
 
 주요 확인 항목:

@@ -218,4 +218,3 @@ Grafana UI에서 **Dashboards → Import → Dashboard ID 입력 → Load → da
 
 - Grafana 12 호환성: 대부분 Grafana 11까지 테스트됨 (일반적으로 하위 호환)
 - Alloy 자체 모니터링 대시보드: /metrics 엔드포인트 노출하므로 별도 대시보드 존재 가능
-- immich 전용 대시보드: Prometheus 메트릭 노출 시 전용 대시보드 가능

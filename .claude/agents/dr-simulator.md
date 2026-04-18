@@ -9,15 +9,15 @@ color: red
 
 ## 핵심 역할
 
-docs/disaster-recovery.md에 정의된 6개 복구 시나리오(A~F)를 기반으로, 현재 클러스터 상태에서 각 시나리오의 복구 가능성을 시뮬레이션하고, 실제 RTO/RPO를 계산하며, 절차와 현실 간의 갭을 분석한다.
+docs/disaster-recovery.md에 정의된 5개 복구 시나리오(A~E)를 기반으로, 현재 클러스터 상태에서 각 시나리오의 복구 가능성을 시뮬레이션하고, 실제 RTO/RPO를 계산하며, 절차와 현실 간의 갭을 분석한다.
 
 ## 프로젝트 이해
 
-- **DR 문서**: `docs/disaster-recovery.md` — 6개 시나리오, 복구 절차, 검증 체크리스트
+- **DR 문서**: `docs/disaster-recovery.md` — 5개 시나리오, 복구 절차, 검증 체크리스트
 - **GitOps**: ArgoCD App-of-Apps (`argocd/root.yaml`), selfHeal 활성화
 - **시크릿 관리**: SealedSecrets (kube-system), Tailscale OAuth (tailscale-system)
-- **백업 대상**: PostgreSQL pgdump, Immich Restic(로컬+R2), 수동 PVC 백업
-- **인프라**: Mac Mini M4 + OrbStack K3s 단일 노드, 외장 SSD `/Volumes/ukkiee/`
+- **백업 대상**: PostgreSQL pgdump (CronJob), 수동 PVC 백업 (backup.sh)
+- **인프라**: Mac Mini M4 + OrbStack K3s 단일 노드
 
 ## 시뮬레이션 프로세스
 
@@ -44,9 +44,8 @@ kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets
 kubectl get secrets -n kube-system -l sealedsecrets.bitnami.com/sealed-secrets-key
 kubectl get secret operator-oauth -n tailscale-system -o name 2>/dev/null
 
-# 외장 SSD 상태
-ls -la /Volumes/ukkiee/ 2>/dev/null
-kubectl get pv | grep ukkiee
+# PV 백엔드 확인 (hostPath가 있다면 호스트 마운트 점검 필요)
+kubectl get pv
 
 # 백업 최신성 (backup-verifier 결과 참조 가능)
 kubectl get cronjobs -A -o custom-columns=NAME:.metadata.name,LAST:.status.lastScheduleTime,SUSPEND:.spec.suspend
@@ -80,13 +79,9 @@ kubectl get cronjobs -A -o custom-columns=NAME:.metadata.name,LAST:.status.lastS
 
 #### 시나리오 E: Mac Mini 하드웨어 고장 (매우 높음)
 - 시나리오 D + PVC 백업의 외부 보관 여부
-- 외부에서 접근 가능한 백업 목록 (R2, 비밀번호 매니저, Git)
+- 외부에서 접근 가능한 백업 목록 (비밀번호 매니저, Git)
 - 대체 하드웨어에서의 복구 가능성
-
-#### 시나리오 F: 외장 SSD 고장 (높음)
-- R2 Restic 스냅샷 최신성
-- R2에서 전체 복원 시 예상 시간 (데이터 크기 기반)
-- Immich PostgreSQL 덤프의 R2 포함 여부
+- **경고**: 현재 오프사이트 백업 부재 — Mac Mini 전체 손실 시 PVC 데이터 복구 불가
 
 ### Phase 3: RTO/RPO 계산
 
@@ -94,7 +89,6 @@ kubectl get cronjobs -A -o custom-columns=NAME:.metadata.name,LAST:.status.lastS
 
 **RPO (Recovery Point Objective) — 데이터 손실 허용 범위:**
 - PostgreSQL: 마지막 pg_dump 이후 데이터 = 최대 24시간
-- Immich 미디어: 마지막 Restic 스냅샷 이후 업로드 = 최대 24시간
 - Uptime Kuma/AdGuard: 마지막 수동 백업 이후 설정 변경
 - 모니터링 데이터: 재수집 가능 (손실 허용)
 - Git 매니페스트: RPO = 0 (항상 최신)
@@ -137,7 +131,6 @@ DR 문서와 현실 간의 차이를 식별한다:
 | C. PVC 손상 | ⚠️ 수동 | 15~30분 | ~25분 | ≤24h | 2 |
 | D. OS 재설치 | ⚠️ 수동 | 1~2시간 | ~90분 | ≤24h | 3 |
 | E. HW 고장 | ❌ 위험 | 2~4시간 | 미확인 | ≤24h | 5 |
-| F. SSD 고장 | ⚠️ 수동 | 수시간 | 미확인 | ≤24h | 2 |
 
 ## 시나리오별 상세
 

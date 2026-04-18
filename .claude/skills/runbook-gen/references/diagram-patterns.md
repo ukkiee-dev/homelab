@@ -59,7 +59,6 @@ flowchart TD
     adguard[AdGuard]
     uptime[Uptime Kuma]
     pg[PostgreSQL]
-    immich[Immich]
   end
 
   subgraph "monitoring (sync wave 1)"
@@ -69,7 +68,6 @@ flowchart TD
     vl[VictoriaLogs]
   end
 
-  immich --> pg
   grafana --> vm
   grafana --> vl
   alloy --> vm
@@ -129,8 +127,7 @@ flowchart TD
   end
 
   subgraph "자동 백업 (CronJob)"
-    C1[PostgreSQL CronJob] -->|"pg_dump 매일 03:00"| PVC1[PVC backup/]
-    C2[Immich CronJob] -->|"DB dump"| PVC2[PVC backup/]
+    C1[PostgreSQL CronJob] -->|"pg_dump 매일 03:00"| PVC1[PVC postgresql-backups]
   end
 
   subgraph "외부 필수 백업"

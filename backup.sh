@@ -50,44 +50,12 @@ backup_pvc "apps" "adguard" "/opt/adguardhome/conf" "adguard-conf"
 backup_pvc "apps" "adguard" "/opt/adguardhome/work" "adguard-work"
 backup_pvc "traefik-system" "traefik" "/letsencrypt" "traefik-acme"
 
-# --- Immich 상태 확인 (데이터는 외장 SSD + R2 Restic으로 별도 백업) ---
+# --- PostgreSQL 백업 CronJob 상태 확인 (덤프 파일은 PVC에 별도 보관) ---
 echo ""
-echo "=== Immich 상태 확인 ==="
-
-# Pod 상태
-IMMICH_PODS=$(kubectl get pods -n immich --no-headers 2>/dev/null | awk '{print $1, $3}')
-if [ -n "$IMMICH_PODS" ]; then
-    echo "  [OK] Immich Pods:"
-    echo "$IMMICH_PODS" | while read -r name status; do
-        echo "        $name: $status"
-    done
-else
-    echo "  [WARN] Immich pods not found"
-fi
-
-# PVC 상태
-IMMICH_PVC=$(kubectl get pvc -n immich --no-headers 2>/dev/null | awk '{print $1, $2}')
-if [ -n "$IMMICH_PVC" ]; then
-    echo "  [OK] Immich PVCs:"
-    echo "$IMMICH_PVC" | while read -r name status; do
-        echo "        $name: $status"
-    done
-else
-    echo "  [WARN] Immich PVCs not found"
-fi
-
-# 외장 SSD 마운트 확인
-if [ -d "/Volumes/ukkiee/immich" ]; then
-    SSD_USAGE=$(df -h /Volumes/ukkiee 2>/dev/null | tail -1 | awk '{print $3 "/" $2 " (" $5 ")"}')
-    echo "  [OK] 외장 SSD: ${SSD_USAGE}"
-else
-    echo "  [WARN] 외장 SSD 미마운트 (/Volumes/ukkiee)"
-fi
-
-# 마지막 CronJob 백업 상태
-LAST_JOB=$(kubectl get jobs -n immich -l job-name --sort-by=.metadata.creationTimestamp --no-headers 2>/dev/null | tail -1 | awk '{print $1, $2}')
-if [ -n "$LAST_JOB" ]; then
-    echo "  [OK] 마지막 백업 Job: $LAST_JOB"
+echo "=== PostgreSQL 백업 CronJob 상태 ==="
+PG_LAST_JOB=$(kubectl get jobs -n apps -l app.kubernetes.io/name=postgresql-backup --sort-by=.metadata.creationTimestamp --no-headers 2>/dev/null | tail -1 | awk '{print $1, $2}')
+if [ -n "$PG_LAST_JOB" ]; then
+    echo "  [OK] 마지막 백업 Job: $PG_LAST_JOB"
 else
     echo "  [INFO] 백업 CronJob 실행 이력 없음"
 fi

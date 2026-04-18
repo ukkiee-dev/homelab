@@ -111,14 +111,14 @@ kubectl describe node | grep -A20 "Allocated resources"
 # PV/PVC 상태
 kubectl get pv,pvc -A
 
-# hostPath PV 확인 (Immich 등)
+# hostPath PV 확인 (있다면 호스트 마운트 필요)
 kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.hostPath.path}{"\n"}{end}'
 
-# 외장 SSD 마운트 확인
-ls -la /Volumes/ukkiee/
+# 외장 볼륨 사용 시 마운트 확인 (예: /Volumes/ukkiee/)
+ls -la /Volumes/ukkiee/ 2>/dev/null
 ```
 
-**흔한 원인**: 외장 SSD 미연결/미마운트, hostPath 디렉토리 권한, PV/PVC 바인딩 모드
+**흔한 원인**: hostPath 디렉토리 권한, PV/PVC 바인딩 모드, local-path-provisioner 상태
 
 ## 모니터링 연동
 
@@ -150,5 +150,5 @@ curl -s 'http://victoria-metrics.monitoring:8428/api/v1/query?query=kube_pod_con
 
 - **K3s 재시작**: `orb restart k8s` — 모든 Pod이 재스케줄링됨. StatefulSet은 PVC 대기 후 복구
 - **네트워크 리셋**: OrbStack 재시작 시 Tailscale/Cloudflare Tunnel 재연결 필요 (보통 자동)
-- **외장 SSD**: `/Volumes/ukkiee/`가 마운트되어야 Immich PV가 정상 동작
+- **hostPath PV**: 외부 볼륨(`/Volumes/ukkiee/` 등)을 참조하는 PV가 있다면 macOS 호스트에서 해당 볼륨이 마운트된 상태여야 함. 현재 활성 워크로드에 hostPath PV는 없음 (모두 local-path-provisioner)
 - **로그 위치**: OrbStack 컨테이너 로그는 `kubectl logs`로 접근. 호스트 로그는 OrbStack 앱에서 확인

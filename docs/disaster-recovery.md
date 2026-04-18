@@ -1,6 +1,6 @@
 # Homelab 재해복구 절차서
 
-> 최종 수정: 2026-03-29
+> 최종 수정: 2026-04-18
 > 대상: Mac Mini M4 + OrbStack K3s + ArgoCD GitOps
 > 도메인: `ukkiee.dev`
 
@@ -24,12 +24,11 @@
 
 | 서비스 | 배포 방식 | Namespace | 데이터 |
 |--------|----------|-----------|--------|
-| Immich (server + ML) | Kustomize | immich | 외장 SSD 미디어 + 내장 PostgreSQL |
 | Homepage | Kustomize | apps | ConfigMap (stateless) |
 | AdGuard Home | Kustomize | apps | PVC (설정 + 필터) |
-| API Server | Kustomize | apps | - |
 | Uptime Kuma | Kustomize | apps | PVC (모니터링 설정) |
-| PostgreSQL | Kustomize | apps | PVC (API 서버 DB) + CronJob 백업 |
+| PostgreSQL | Kustomize | apps | PVC + CronJob pg_dump 백업 |
+| Test Web | Kustomize | test-web | - (CI/CD 테스트용) |
 
 ### Monitoring (monitoring/)
 
@@ -42,8 +41,8 @@
 
 ### 접근 경로
 
-- **Cloudflare Tunnel (공개):** photos.ukkiee.dev, home.ukkiee.dev, api.ukkiee.dev
-- **Tailscale-only (내부):** argo, traefik, status, dns, grafana 등
+- **Cloudflare Tunnel (공개):** test-web.ukkiee.dev 등 public 앱
+- **Tailscale-only (내부):** argo, traefik, home, status, dns, grafana, api 등
 - **시크릿 관리:** SealedSecrets
 
 ---
@@ -57,7 +56,6 @@
 | C. PVC 데이터 손상 | 중간 | 최대 24시간 | 15~30분 |
 | D. Mac Mini OS 재설치 | 높음 | PVC 데이터 | 1~2시간 |
 | E. Mac Mini 하드웨어 고장 | 매우 높음 | 로컬 전체 | 2~4시간 |
-| F. 외장 SSD 고장 | 높음 | Immich 미디어 | 수시간~수일 |
 
 ---
 
@@ -69,9 +67,7 @@
 | **시크릿 원본값** | CF API Token, Tunnel Token, OAuth 키 등 | 비밀번호 매니저 |
 | **Tailscale OAuth** | operator-oauth Secret (client_id, client_secret) | 비밀번호 매니저 |
 | **PVC 백업** | `backup.sh` 출력 (Uptime Kuma, AdGuard, Traefik ACME) | 외부 디스크 / NAS |
-| **PostgreSQL pgdump** | API 서버 DB (CronJob 매일 03:00 KST 자동 덤프) | apps namespace PVC |
-| **Immich pgdump** | Immich DB 메타 + 벡터 (CronJob 자동 덤프) | 외장 SSD → R2 |
-| **Immich 미디어** | 원본 사진/동영상 | 외장 SSD + R2 Restic |
+| **PostgreSQL pgdump** | PostgreSQL DB (CronJob 매일 03:00 KST 자동 덤프) | apps namespace PVC |
 
 ### 백업 불필요 (Git에서 복구 가능)
 
@@ -175,7 +171,6 @@ watch kubectl get applications -n argocd
 # === Step 6: 데이터 복원 (10~15분) ===
 # PVC 백업에서 복원: Uptime Kuma, AdGuard, Traefik ACME
 # PostgreSQL은 CronJob 백업에서 복원
-# Immich는 외장 SSD 연결 후 자동 복구
 
 # === Step 7: 검증 ===
 make health
@@ -186,21 +181,6 @@ make pvc
 ### E. Mac Mini 하드웨어 고장
 
 시나리오 D와 동일. PVC 백업이 외부에 없으면 데이터 전체 손실.
-
-### F. 외장 SSD 고장 (Immich)
-
-```bash
-# SSD 분리 (재연결 가능한 경우)
-diskutil list | grep ukkiee
-diskutil mount /dev/diskN
-kubectl rollout restart deployment -n immich
-
-# SSD 고장 (복구 불가)
-# 1. 새 SSD 포맷 + 디렉토리 구조 재생성
-# 2. Immich PostgreSQL pgdump 복원
-# 3. 미디어 R2 Restic에서 복원 (수시간~수일)
-# 4. 썸네일은 Immich가 자동 재생성
-```
 
 ---
 
@@ -223,9 +203,7 @@ kubectl apply -f sealed-secrets-key-backup.yaml
 | 대상 | 방식 | 주기 | 보존 |
 |------|------|------|------|
 | Uptime Kuma, AdGuard, Traefik | `backup.sh` (수동) | 수동 실행 | 최근 7개 |
-| PostgreSQL (API 서버) | CronJob `postgresql-backup` | 매일 03:00 KST | 7일 |
-| Immich PostgreSQL | CronJob `immich-backup` | 매일 (확인 필요) | 외장 SSD + R2 |
-| Immich 미디어 | 외장 SSD 원본 + R2 Restic | - | R2 보존 정책 |
+| PostgreSQL | CronJob `postgresql-backup` | 매일 03:00 KST | 7일 |
 
 ---
 
@@ -241,15 +219,14 @@ kubectl apply -f sealed-secrets-key-backup.yaml
 - [ ] Traefik Pod Running + TLS 인증서 유효
 - [ ] Cloudflare Tunnel 연결 (cloudflared Pod 정상)
 - [ ] Tailscale Operator 동작
-- [ ] `photos.ukkiee.dev` 외부 접근 가능
+- [ ] 공개 서비스 (Tunnel) 외부 접근 가능
 - [ ] `argo.ukkiee.dev` Tailscale 접근 가능
 
 ### 서비스
 - [ ] Homepage 위젯 정상 표시
 - [ ] AdGuard DNS 쿼리 정상 응답
 - [ ] Uptime Kuma 모니터링 대상 정상
-- [ ] Immich 웹 UI + 사진 조회 정상
-- [ ] API Server health 정상
+- [ ] PostgreSQL 접속 가능
 - [ ] ARC Runner가 GitHub에 연결
 - [ ] Grafana 대시보드 로딩 정상
 
@@ -258,7 +235,6 @@ kubectl apply -f sealed-secrets-key-backup.yaml
 - [ ] Uptime Kuma 모니터 설정 존재
 - [ ] AdGuard 필터/설정 복원
 - [ ] Traefik ACME 인증서 존재
-- [ ] Immich 외장 SSD 마운트 + 미디어 접근 가능
 - [ ] PostgreSQL 백업 CronJob 정상 실행
 
 ---

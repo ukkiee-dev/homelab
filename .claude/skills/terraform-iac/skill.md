@@ -141,7 +141,7 @@ Cloudflare Terraform provider 상세 정보가 필요하면:
 4. 결과: PASS, "terraform apply는 CI에서 실행됩니다" 안내
 
 ### 에러 흐름: 서브도메인 충돌
-1. 사용자: "새 앱을 서브도메인 photos로 추가해줘"
+1. 사용자: "새 앱을 서브도메인 argo로 추가해줘"
 2. Phase 1: iac-engineer가 apps.json 수정 시도
-3. Phase 2: drift-detector가 검증 — photos 서브도메인이 immich와 충돌 감지
-4. 결과: FAIL, "photos 서브도메인은 immich가 사용 중" 보고, 대안 서브도메인 제안
+3. Phase 2: drift-detector가 검증 — argo 서브도메인이 argocd 앱과 충돌 감지
+4. 결과: FAIL, "argo 서브도메인은 argocd가 사용 중" 보고, 대안 서브도메인 제안

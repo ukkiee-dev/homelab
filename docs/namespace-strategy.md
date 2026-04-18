@@ -1,12 +1,11 @@
 # 네임스페이스 전략
 
-> 최종 업데이트: 2026-04-02
+> 최종 업데이트: 2026-04-18
 
 ## 분류 기준
 
 | 기준 | 전용 NS | 공유 NS (apps) |
 |------|---------|---------------|
-| PVC 있음 + 격리 필요 | immich (4 PVC, pgvector) | - |
 | CI/CD 자동 생성 앱 | test-web 등 (setup-app 생성) | - |
 | 경량 stateful/stateless | - | adguard, homepage, uptime-kuma, postgresql |
 
@@ -15,7 +14,6 @@
 | NS | 용도 | 워크로드 | 관리 방식 |
 |----|------|---------|----------|
 | **apps** | 사용자 앱 (공유) | adguard, homepage, uptime-kuma, postgresql | ArgoCD Kustomize + Helm(pg) |
-| **immich** | 사진 라이브러리 (격리) | server, ml, postgres, redis, backup | ArgoCD Kustomize |
 | **test-web** | CI/CD 테스트 앱 (격리) | test-web | ArgoCD Kustomize (자동 생성) |
 | **monitoring** | 모니터링 스택 | victoria-metrics, grafana, alloy, node-exporter, ksm, vlogs | ArgoCD Kustomize |
 | **argocd** | GitOps 엔진 | controller, server, repo-server, redis, image-updater | Helm + ArgoCD Kustomize |
@@ -28,7 +26,7 @@
 ## 격리 기준
 
 **전용 NS 사용 조건** (하나 이상 해당):
-1. 독자적 DB + PVC가 있고 다른 앱과 공유하지 않음 (immich)
+1. 독자적 DB + PVC가 있고 다른 앱과 공유하지 않음
 2. CI/CD 파이프라인이 자동으로 생성/삭제 (test-web 등)
 3. 클러스터 인프라 구성요소 (traefik, tailscale, argocd, monitoring)
 

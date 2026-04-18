@@ -123,8 +123,8 @@ spec:
 | 일반 웹앱 | 50m / 300m | 128Mi / 256Mi |
 | 프록시/게이트웨이 (traefik) | 100m / 300m | 128Mi / 256Mi |
 | 데이터베이스 (postgres) | 100m / 500m | 256Mi / 512Mi |
-| 무거운 워크로드 (immich-server) | 200m / 1000m | 512Mi / 1Gi |
-| ML 워크로드 (immich-ml) | 100m / 2000m | 512Mi / 4Gi |
+| 무거운 워크로드 (예: 미디어 서버, 빌드 러너) | 200m / 1000m | 512Mi / 1Gi |
+| ML 워크로드 (예: 임베딩, 벡터 검색) | 100m / 2000m | 512Mi / 4Gi |
 
 새 앱은 `일반 웹앱` 범위로 시작하고, 모니터링 데이터에 따라 조정한다.
 
@@ -163,7 +163,7 @@ spec:
 
 ### Sync Wave
 - **-1**: 인프라 (ArgoCD, Traefik, Cloudflared, Tailscale, Sealed Secrets, ARC, NetworkPolicy)
-- **0**: 애플리케이션 (Immich, Homepage, AdGuard, Uptime Kuma, PostgreSQL)
+- **0**: 애플리케이션 (Homepage, AdGuard, Uptime Kuma, PostgreSQL, test-web)
 - **1**: 모니터링 (VictoriaMetrics, Grafana, Alloy, kube-state-metrics)
 
 ### Multi-source 패턴 (Helm + Kustomize)
@@ -334,7 +334,6 @@ readinessProbe:
 | `actions-runner-system` | CI/CD | ARC Runner |
 | `monitoring` | 관측성 스택 | VictoriaMetrics, Grafana, Alloy 등 |
 | `apps` | 일반 애플리케이션 (공유) | Homepage, AdGuard, Uptime Kuma, PostgreSQL |
-| `immich` | 전용 네임스페이스 | Immich (복합 서비스) |
-| `test-app` | 테스트 전용 | Test-App |
+| `test-web` | CI/CD 테스트 앱 전용 | test-web (setup-app 자동 생성) |
 
 복합 서비스(컴포넌트 3개 이상)는 전용 네임스페이스를 사용하고, 단순 서비스는 `apps` 네임스페이스를 공유한다.

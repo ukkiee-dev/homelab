@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       hostname:
-        description: "제거할 hostname (예: photos.ukkiee.dev)"
+        description: "제거할 hostname (예: test-web.ukkiee.dev)"
         required: true
 
 

@@ -45,14 +45,14 @@ terraform/
 - **subdomain**: DNS CNAME 레코드의 name 필드. 결과: `{subdomain}.ukkiee.dev`
 - **공개 앱만 등록**: IngressRoute가 있는 public 앱만. worker/internal 앱은 등록하지 않음
 - **중복 금지**: 앱 이름과 서브도메인 모두 유일해야 함
-- **앱 이름 ≠ 서브도메인**: immich의 서브도메인은 photos (사용자 친화적 URL)
+- **앱 이름 ≠ 서브도메인**: 가능. 예) 앱 이름은 `argocd`, 서브도메인은 `argo`
 
 ### 현재 등록 앱
 
 ```json
 {
-  "immich": { "subdomain": "photos" },
-  "test-app": { "subdomain": "test-app" }
+  "argocd": { "subdomain": "argo" },
+  "test-web": { "subdomain": "test-web" }
 }
 ```
 
@@ -87,7 +87,7 @@ resource "cloudflare_record" "apps" {
 
 ### 리소스 주소
 
-State에서의 주소: `cloudflare_record.apps["immich"]`, `cloudflare_record.apps["test-app"]`
+State에서의 주소: `cloudflare_record.apps["argocd"]`, `cloudflare_record.apps["test-web"]`
 key는 앱 이름(JSON key)이지 서브도메인이 아님에 주의.
 
 ### 새 리소스 타입 추가 시

@@ -112,7 +112,7 @@ Agent(
 5. 리뷰 WARN/FAIL → manifest-engineer 재호출하여 수정 후 재리뷰
 
 ### 에러 흐름: 트러블슈팅 → 수정
-1. **입력**: "immich 파드가 CrashLoopBackOff야"
+1. **입력**: "adguard 파드가 CrashLoopBackOff야"
 2. cluster-ops가 진단 (kubectl logs, describe, events 분석)
 3. 근본 원인 발견 (예: memory limit 초과)
 4. 매니페스트 수정 필요 → manifest-engineer에게 구체적 수정 사항 전달

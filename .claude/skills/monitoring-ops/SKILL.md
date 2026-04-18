@@ -123,7 +123,7 @@ _workspace/
 ## 테스트 시나리오
 
 ### 정상 흐름: 새 앱 모니터링 설정
-1. **입력**: "test-app에 모니터링 설정해줘. 네임스페이스: test-app, 포트: 3000, 메트릭 엔드포인트 없음"
+1. **입력**: "test-web에 모니터링 설정해줘. 네임스페이스: test-web, 포트: 3000, 메트릭 엔드포인트 없음"
 2. 3개 에이전트 병렬 스폰 (dashboard + alert + query)
 3. dashboard-designer: 기본 패널 6개 (CPU, Memory, Pod 상태, 재시작, 네트워크, 에러 로그)
 4. alert-engineer: 앱 전용 알람 2개 (health check 실패, 에러 로그 급증)
@@ -132,7 +132,7 @@ _workspace/
 7. 통합 보고서 + 적용 방법 안내
 
 ### 에러 흐름: 리뷰 FAIL
-1. **입력**: "immich 모니터링 강화해줘"
+1. **입력**: "postgresql 모니터링 강화해줘"
 2. 3개 에이전트 병렬 → 리뷰어 검증
 3. 리뷰어: 알람 커버리지 FAIL (백업 CronJob 실패 알람 누락)
 4. alert-engineer 재호출 → 백업 실패 알람 추가

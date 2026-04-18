@@ -59,13 +59,11 @@ GitHub Actions
 │   │   ├── sealed-secrets/      # Sealed Secrets Helm values
 │   │   └── network-policies/    # Namespace NetworkPolicy rules
 │   ├── apps/
-│   │   ├── immich/              # Photo library (server, ML, postgres, redis)
 │   │   ├── homepage/            # Service dashboard
 │   │   ├── adguard/             # DNS ad blocker
 │   │   ├── uptime-kuma/         # Uptime monitoring
-│   │   ├── api-server/          # Custom API backend
 │   │   ├── postgresql/          # Shared PostgreSQL + backup CronJob
-│   │   └── test-blog/           # Test blog application
+│   │   └── test-web/            # CI/CD test application
 │   └── monitoring/
 │       ├── victoria-metrics/    # Metrics TSDB (30d retention)
 │       ├── victoria-logs/       # Log store (15d retention)
@@ -92,7 +90,7 @@ GitHub Actions
 │   └── scripts/
 │       └── manage-tunnel-ingress.sh  # Tunnel API 관리 스크립트
 ├── docs/
-│   └── disaster-recovery.md     # DR playbook (6 scenarios)
+│   └── disaster-recovery.md     # DR playbook (5 scenarios)
 ├── scripts/
 │   ├── setup.sh                 # CLI tool installer + context setup
 │   └── seal-secret.sh           # SealedSecret 관리 유틸리티
@@ -107,12 +105,11 @@ GitHub Actions
 
 | Service | Domain | Access | Description |
 |---------|--------|--------|-------------|
-| [Immich](https://github.com/immich-app/immich) | `photos.ukkiee.dev` | Public | Self-hosted photo/video library |
-| Test Blog | `blog.ukkiee.dev` | Public | Test blog application |
+| Test Web | `test-web.ukkiee.dev` | Public | CI/CD 테스트 앱 (setup-app 자동 생성) |
 | [Homepage](https://github.com/gethomepage/homepage) | `home.ukkiee.dev` | Tailscale | Service dashboard |
 | [AdGuard Home](https://github.com/AdguardTeam/AdGuardHome) | `adguard.ukkiee.dev` | Tailscale | DNS ad blocker |
 | [Uptime Kuma](https://github.com/louislam/uptime-kuma) | `status.ukkiee.dev` | Tailscale | Uptime monitoring |
-| API Server | `api.ukkiee.dev` | Tailscale | Custom API backend |
+| PostgreSQL | - | Cluster internal | Shared Postgres (Bitnami Helm) |
 
 ### Infrastructure
 
@@ -138,11 +135,11 @@ GitHub Actions
 
 ## Networking
 
-**Public** (Cloudflare Tunnel): `photos.ukkiee.dev`, `blog.ukkiee.dev`
+**Public** (Cloudflare Tunnel): `test-web.ukkiee.dev` (및 setup-app으로 추가되는 public 앱)
 
 **Public** (TLS only): `grafana.ukkiee.dev`
 
-**Internal** (Tailscale-only): `home`, `api`, `dns`, `status`, `argo`, `traefik` (all `*.ukkiee.dev`)
+**Internal** (Tailscale-only): `home`, `dns`, `status`, `argo`, `traefik` (all `*.ukkiee.dev`)
 
 **Security**:
 - Cloudflare WAF: 5 custom rules (verified bot allow, geo challenge, threat score, malicious UA block, sensitive path block)
@@ -189,9 +186,7 @@ GitHub Actions
 
 | Data | Method | Schedule | Retention |
 |------|--------|----------|-----------|
-| Immich DB | CronJob `pg_dump` → external SSD + Restic → R2 | Daily 03:00 KST | 7d / 4w / 6m |
-| Immich media | External SSD + Restic → R2 | Daily 03:00 KST | 7d / 4w / 6m |
-| PostgreSQL (shared) | CronJob `pg_dump` | Daily 03:00 KST | 7 days |
+| PostgreSQL (shared) | CronJob `pg_dump` → PVC `postgresql-backups` | Daily 03:00 KST | 7 days |
 | PVC data (AdGuard, Uptime Kuma, Traefik ACME) | `backup.sh` | Manual | Last 7 backups |
 
 **External backup 필수 항목** (클러스터 외부 보관):
@@ -240,7 +235,7 @@ make seal-secret NS=<ns> NAME=<n> KEY=<v> # SealedSecret 생성
 
 ## Disaster Recovery
 
-6가지 시나리오별 복구 절차가 [`docs/disaster-recovery.md`](docs/disaster-recovery.md)에 문서화되어 있다.
+5가지 시나리오별 복구 절차가 [`docs/disaster-recovery.md`](docs/disaster-recovery.md)에 문서화되어 있다.
 
 | Scenario | Recovery Time |
 |----------|--------------|
@@ -249,4 +244,3 @@ make seal-secret NS=<ns> NAME=<n> KEY=<v> # SealedSecret 생성
 | PVC 데이터 손상 | 15-30분 |
 | macOS 재설치 | 1-2시간 |
 | 하드웨어 교체 | 2-4시간 |
-| 외장 SSD 장애 | 수시간-수일 |

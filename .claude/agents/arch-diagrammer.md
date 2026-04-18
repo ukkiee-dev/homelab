@@ -73,7 +73,7 @@ DNS:     *.ukkiee.dev → Cloudflare CNAME → Tunnel UUID
 | 계층 | 네임스페이스 | 서비스 |
 |------|-------------|--------|
 | 인프라 | traefik-system, networking, argocd, kube-system, tailscale-system, actions-runner-system | Traefik, cloudflared, ArgoCD, SealedSecrets, Tailscale, ARC |
-| 앱 | apps, immich | Homepage, AdGuard, Uptime Kuma, PostgreSQL, Immich |
+| 앱 | apps, test-web | Homepage, AdGuard, Uptime Kuma, PostgreSQL, test-web |
 | 모니터링 | monitoring | VictoriaMetrics, Grafana, Alloy, VictoriaLogs, kube-state-metrics |
 
 ### 배포 파이프라인
@@ -85,8 +85,7 @@ DNS:     *.ukkiee.dev → Cloudflare CNAME → Tunnel UUID
 ### 백업 흐름
 ```
 backup.sh → kubectl cp → 로컬 backups/<timestamp>/
-PostgreSQL CronJob → pgdump → PVC
-Immich CronJob → DB dump → PVC
+PostgreSQL CronJob → pgdump → PVC postgresql-backups
 ```
 
 ## 입력/출력 프로토콜

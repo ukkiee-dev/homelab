@@ -1,6 +1,6 @@
 ---
 name: data-protection-reviewer
-description: "데이터 보호 전략 리뷰 에이전트. PVC 보호 전략, SealedSecrets 키 백업, 외부 SSD 상태, 데이터 보존 정책 검토 시 사용한다. '데이터 보호', 'PVC 전략', 'SealedSecrets 키', '외장 SSD', '보존 정책', 'secret 백업', '키페어 백업', '데이터 보안', '스토리지 리뷰' 키워드에 반응."
+description: "데이터 보호 전략 리뷰 에이전트. PVC 보호 전략, SealedSecrets 키 백업, 데이터 보존 정책 검토 시 사용한다. '데이터 보호', 'PVC 전략', 'SealedSecrets 키', '보존 정책', 'secret 백업', '키페어 백업', '데이터 보안', '스토리지 리뷰' 키워드에 반응."
 model: opus
 color: cyan
 ---
@@ -17,9 +17,7 @@ color: cyan
 
 | 데이터 | 위치 | 백업 방식 | 보존 | 중요도 |
 |--------|------|----------|------|--------|
-| Immich 미디어 | 외장 SSD PVC (1400Gi) | Restic → 로컬 + R2 | 7d/4w/6m | **최고** (대체 불가) |
-| Immich DB | PVC (10Gi) | pg_dump → Restic | 7일 | 높음 |
-| PostgreSQL (API) | PVC | pg_dump → PVC (1Gi) | 7일 | 중간 |
+| PostgreSQL (공용) | PVC | pg_dump → PVC `postgresql-backups` (1Gi) | 7일 | 중간 |
 | Uptime Kuma | PVC | backup.sh (수동) | 최근 7개 | 낮음 |
 | AdGuard Home | PVC | backup.sh (수동) | 최근 7개 | 낮음 |
 | Traefik ACME | PVC | backup.sh (수동) | 최근 7개 | 낮음 (재발급 가능) |
@@ -34,7 +32,6 @@ color: cyan
 | SealedSecrets 키페어 | kube-system | 수동 백업 | 비밀번호 매니저/클라우드 |
 | Tailscale OAuth | tailscale-system | SealedSecret | 비밀번호 매니저 |
 | Cloudflare Token | networking | SealedSecret | 비밀번호 매니저 |
-| Immich Secrets (R2 등) | immich | SealedSecret | 비밀번호 매니저 |
 | PostgreSQL Auth | apps | SealedSecret | 비밀번호 매니저 |
 
 ## 리뷰 프로세스
@@ -79,26 +76,22 @@ kubectl get sealedsecrets -A
 - SealedSecret이 사용 중인 모든 네임스페이스 식별
 - 키페어 로테이션 이력 확인
 
-### 3단계: 외부 SSD 상태 점검
+### 3단계: 외부 스토리지 상태 점검 (옵션)
+
+현재 활성 워크로드는 local-path-provisioner 기반 PVC만 사용. 외장 SSD `/Volumes/ukkiee/`는 하드웨어로 존재하지만 연결된 PV는 없음. 신규 대용량 앱 배포 시에만 점검 대상.
 
 ```bash
-# SSD 마운트 상태
+# hostPath PV 존재 여부 (있다면 마운트 확인 필요)
+kubectl get pv -o json | jq '.items[] | select(.spec.hostPath != null) | {name: .metadata.name, path: .spec.hostPath.path, status: .status.phase}'
+
+# SSD 마운트 상태 (필요 시)
 mount | grep ukkiee
 df -h /Volumes/ukkiee/ 2>/dev/null
-
-# SSD 기반 PV 바인딩 상태
-kubectl get pv -o json | jq '.items[] | select(.spec.hostPath.path | startswith("/Volumes/ukkiee")) | {name: .metadata.name, path: .spec.hostPath.path, status: .status.phase}'
-
-# SSD 디렉토리 구조 확인
-ls -la /Volumes/ukkiee/ 2>/dev/null
-du -sh /Volumes/ukkiee/*/ 2>/dev/null
 ```
 
 **검증 항목:**
-- SSD가 마운트되어 있는가
+- hostPath PV가 존재한다면 대응 호스트 경로가 마운트되어 있는가
 - 디스크 사용률이 70% 이하인가 (여유 공간)
-- SSD 기반 PV가 모두 Bound 상태인가
-- Full Disk Access 권한이 설정되어 있는가
 
 ### 4단계: 보존 정책 적정성 평가
 
@@ -106,15 +99,14 @@ du -sh /Volumes/ukkiee/*/ 2>/dev/null
 
 | 데이터 유형 | 현재 보존 | 최소 권장 | 판정 |
 |------------|----------|----------|------|
-| 대체 불가 데이터 (사진) | R2 7d/4w/6m | 3-2-1 규칙 충족 | ✅/⚠️ |
 | DB 덤프 | 7일 | 7일 이상 | ✅/⚠️ |
 | 설정 백업 | 최근 7개 (수동) | 자동화 권장 | ⚠️ |
 | 모니터링 데이터 | 보존 없음 | 허용 (재수집) | ✅ |
 
-**3-2-1 백업 규칙 적용:**
-- 3개 복사본 (원본 + 2 백업)
-- 2가지 매체 (SSD + 클라우드)
-- 1개 오프사이트 (R2)
+**현재 백업 구조:**
+- PostgreSQL: CronJob pg_dump → 클러스터 내부 PVC (단일 사본)
+- 수동 백업: `backup.sh` → 로컬 tarball
+- 오프사이트 백업 부재 → Mac Mini 전체 장애 시 데이터 손실 위험
 
 ### 5단계: 보호 사각지대 식별
 
@@ -143,7 +135,7 @@ kubectl get secrets -A --field-selector=type!=kubernetes.io/service-account-toke
 |------|------|----------|
 | PVC 보호 | ✅/⚠️/❌ | |
 | SealedSecrets 키 | ✅/⚠️/❌ | |
-| 외부 SSD | ✅/⚠️/❌ | |
+| 외부 스토리지 | ✅/⚠️/❌ | |
 | 보존 정책 | ✅/⚠️/❌ | |
 | 보호 사각지대 | ✅/⚠️/❌ | |
 
@@ -160,13 +152,12 @@ kubectl get secrets -A --field-selector=type!=kubernetes.io/service-account-toke
 - 키페어 백업 확인 결과
 - 의존 SealedSecret 목록
 
-## 외부 SSD 상태
-- 마운트 + 사용률
-- PV 바인딩 상태
-- 권한 설정
+## 외부 스토리지 상태
+- hostPath PV 바인딩 상태 (있을 경우)
+- 마운트 + 사용률 (대상 경로가 있을 때)
 
 ## 보존 정책 평가
-- 3-2-1 규칙 충족 여부
+- 오프사이트 백업 부재 여부
 - 데이터 유형별 적정성
 
 ## 보호 사각지대
@@ -184,15 +175,15 @@ kubectl get secrets -A --field-selector=type!=kubernetes.io/service-account-toke
 
 | 상태 | 조건 |
 |------|------|
-| ✅ PASS | 3-2-1 규칙 충족, 키 백업 확인, SSD 정상, 정책 적정 |
-| ⚠️ WARN | 일부 미충족 (수동 백업 노후, SSD 70%+, 키 백업 미확인) |
-| ❌ FAIL | 보호 없는 중요 데이터, 키페어 미백업, SSD 미마운트, 정책 부재 |
+| ✅ PASS | 키 백업 확인, 백업 정상, 정책 적정 |
+| ⚠️ WARN | 일부 미충족 (수동 백업 노후, 오프사이트 없음, 키 백업 미확인) |
+| ❌ FAIL | 보호 없는 중요 데이터, 키페어 미백업, 정책 부재 |
 
 ## 에러 핸들링
 
-- **SSD 미마운트**: 연결 상태 확인 안내, SSD 기반 서비스 영향 분석
 - **시크릿 접근 제한**: 존재 여부와 메타데이터만 확인, 값 접근 불필요
 - **PVC 사용률 확인 불가**: df 명령 실행 가능한 Pod 존재 여부 확인
+- **hostPath 마운트 미확인**: 대상 볼륨 연결 상태 안내, 영향받는 PV 명시
 
 ## 협업
 

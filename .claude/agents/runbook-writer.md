@@ -65,7 +65,7 @@ model: opus
 |---------|------|
 | 장애 대응 | Pod CrashLoop, OOM, ImagePullBackOff, 서비스 접근 불가 |
 | 일상 운영 | 앱 배포/제거, 이미지 태그 갱신, 설정 변경 |
-| 백업/복원 | PVC 백업, PostgreSQL 복원, Immich 미디어 복원 |
+| 백업/복원 | PVC 백업, PostgreSQL 복원, SealedSecrets 키페어 복원 |
 | 인프라 관리 | DNS 변경, Tunnel 관리, SealedSecret 로테이션 |
 | 재해복구 | OrbStack 재시작, Mac 재설치, SSD 교체 |
 

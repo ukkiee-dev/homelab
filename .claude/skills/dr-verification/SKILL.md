@@ -37,11 +37,10 @@ Agent(
     백업 시스템 전체 검증을 수행하라.
 
     검증 대상:
-    1. CronJob 실행 상태: postgresql-backup (apps), immich-backup (immich)
+    1. CronJob 실행 상태: postgresql-backup (apps)
     2. pg_dump 파일 무결성: 오늘자 파일 존재 + 크기 확인
-    3. Restic 스냅샷: 로컬 + R2 최신성, 스냅샷 수
-    4. 수동 백업: backup.sh 최신 tarball 상태
-    5. 보존 정책 준수: 7일/7d-4w-6m 정책 적용 확인
+    3. 수동 백업: backup.sh 최신 tarball 상태
+    4. 보존 정책 준수: 7일 정책 적용 확인
 
     출력: 마크다운 보고서 (요약 테이블 + 상세 진단 + 발견 문제)
   "
@@ -193,7 +192,7 @@ Agent(
 
 ### 문제 발견 흐름
 1. **입력**: "전체 백업 상태 확인"
-2. Phase 1: immich-backup CronJob 48시간 미실행 → FAIL
-3. Phase 2: 시나리오 F RPO가 48시간으로 확대 → Critical
-4. Phase 3: R2 동기화 중단으로 3-2-1 규칙 미충족 → Critical
+2. Phase 1: postgresql-backup CronJob 48시간 미실행 → FAIL
+3. Phase 2: 시나리오 C/D RPO가 48시간으로 확대 → Critical
+4. Phase 3: 오프사이트 백업 부재 경고 → Critical
 5. 통합 보고서: CRITICAL, 즉시 조치 필요 항목 3개
