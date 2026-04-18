@@ -19,6 +19,10 @@ spec:
         app.kubernetes.io/name: cloudflared
         app.kubernetes.io/component: tunnel
         app.kubernetes.io/part-of: homelab
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2000"
+        prometheus.io/path: "/metrics"
     spec:
       priorityClassName: infra-critical
       containers:
