@@ -9,6 +9,11 @@ on:
       image-tag:
         type: string
         required: true
+      service:
+        description: "모노레포 서비스 이름. 비면 flat 경로(기존), 채우면 services/<service>/deployment.yaml + <app>-<service> 이미지."
+        type: string
+        required: false
+        default: ""
     secrets:
       APP_ID:
         required: true
@@ -51,17 +56,27 @@ jobs:
         env:
           APP_NAME: ${{ inputs.app-name }}
           IMAGE_TAG: ${{ inputs.image-tag }}
+          SERVICE: ${{ inputs.service }}
         run: |
           set -euo pipefail
-          FILE="manifests/apps/${APP_NAME}/deployment.yaml"
+          # service 비었으면 flat 앱(기존). 채웠으면 모노레포 서비스 경로.
+          if [ -z "$SERVICE" ]; then
+            FILE="manifests/apps/${APP_NAME}/deployment.yaml"
+            IMAGE="ghcr.io/ukkiee-dev/${APP_NAME}:${IMAGE_TAG}"
+            COMMIT_SCOPE="${APP_NAME}"
+          else
+            FILE="manifests/apps/${APP_NAME}/services/${SERVICE}/deployment.yaml"
+            IMAGE="ghcr.io/ukkiee-dev/${APP_NAME}-${SERVICE}:${IMAGE_TAG}"
+            COMMIT_SCOPE="${APP_NAME}/${SERVICE}"
+          fi
 
           if [ ! -f "$FILE" ]; then
             echo "❌ 매니페스트 없음: $FILE"
             exit 1
           fi
 
-          yq eval -i \
-            ".spec.template.spec.containers[0].image = \"ghcr.io/ukkiee-dev/${APP_NAME}:${IMAGE_TAG}\"" \
+          IMAGE="$IMAGE" yq eval -i \
+            ".spec.template.spec.containers[0].image = strenv(IMAGE)" \
             "$FILE"
 
           git config user.email "deploy-bot@users.noreply.github.com"
@@ -72,7 +87,7 @@ jobs:
             exit 0
           fi
 
-          git commit -am "chore: update ${APP_NAME} → ${IMAGE_TAG}"
+          git commit -am "chore: update ${COMMIT_SCOPE} → ${IMAGE_TAG}"
 
       - name: Push with retry
         uses: ./.github/actions/git-push-retry
@@ -81,10 +96,13 @@ jobs:
         if: failure()
         env:
           APP_NAME: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          SCOPE="${APP_NAME}"
+          [ -n "$SERVICE" ] && SCOPE="${APP_NAME}/${SERVICE}"
           curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             -d chat_id="${TG_CHAT}" \
-            -d text="❌ 이미지 태그 갱신 실패: ${APP_NAME}%0A${RUN_URL}"
+            -d text="❌ 이미지 태그 갱신 실패: ${SCOPE}%0A${RUN_URL}"

@@ -6,6 +6,10 @@ on:
       app-name:
         description: "앱 이름 (namespace)"
         required: true
+      service:
+        description: "모노레포 서비스 이름 (예: api). 비우면 flat 앱 경로 사용."
+        required: false
+        default: ""
       icon:
         description: "Homepage 아이콘 (예: si-astro). 비워두면 변경 안 함"
         required: false
@@ -52,78 +56,86 @@ jobs:
       - name: Validate inputs
         env:
           APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
           ICON: ${{ inputs.icon }}
           DESC: ${{ inputs.description }}
           HEALTH: ${{ inputs.health }}
         run: |
           set -euo pipefail
 
-          # 최소 1개 입력 검증
           if [ -z "$ICON" ] && [ -z "$DESC" ] && [ -z "$HEALTH" ]; then
             echo "::error::icon, description, health 중 최소 1개를 입력해야 합니다"
             exit 1
           fi
 
-          # app-name 검증 (K8s namespace = RFC 1123 DNS label)
           if [[ ! "$APP" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]] || [ ${#APP} -gt 63 ]; then
             echo "::error::app-name은 소문자·숫자·하이픈만 허용, 소문자로 시작/끝, 63자 이하"
             exit 1
           fi
 
-          # 매니페스트 디렉토리 존재 확인
-          if [ ! -d "manifests/apps/$APP" ]; then
-            echo "::error::manifests/apps/$APP 디렉토리가 존재하지 않습니다"
+          if [ -n "$SERVICE" ] && [[ ! "$SERVICE" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]]; then
+            echo "::error::service 이름도 RFC 1123 형식이어야 합니다"
             exit 1
           fi
 
-          # health 경로 형식 검증
+          # 대상 경로 결정
+          if [ -z "$SERVICE" ]; then
+            BASE="manifests/apps/$APP"
+          else
+            BASE="manifests/apps/$APP/services/$SERVICE"
+          fi
+          echo "BASE=$BASE" >> "$GITHUB_ENV"
+
+          if [ ! -d "$BASE" ]; then
+            echo "::error::$BASE 디렉토리가 존재하지 않습니다"
+            exit 1
+          fi
+
           if [ -n "$HEALTH" ] && [[ ! "$HEALTH" =~ ^/ ]]; then
             echo "::error::health 경로는 /로 시작해야 합니다 (예: /healthz)"
             exit 1
           fi
 
-          # worker 앱 분기: IngressRoute 없으면 icon/description 변경 불가
           if [ -n "$ICON" ] || [ -n "$DESC" ]; then
-            if [ ! -f "manifests/apps/$APP/ingressroute.yaml" ]; then
-              echo "::error::worker 앱은 IngressRoute가 없어 icon/description 변경이 불가합니다"
+            if [ ! -f "$BASE/ingressroute.yaml" ]; then
+              echo "::error::IngressRoute가 없어 icon/description 변경이 불가합니다 ($BASE)"
               exit 1
             fi
           fi
 
-          echo "✅ 입력값 검증 통과"
+          echo "✅ 입력값 검증 통과 (BASE=$BASE)"
 
       - name: Update manifests
         env:
           APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
           ICON: ${{ inputs.icon }}
           DESC: ${{ inputs.description }}
           HEALTH: ${{ inputs.health }}
         run: |
           set -euo pipefail
+          # BASE는 Validate 단계에서 $GITHUB_ENV로 주입됨
           CHANGED=false
 
-          # icon 갱신
           if [ -n "$ICON" ]; then
             ICON="$ICON" yq -i '.metadata.annotations["gethomepage.dev/icon"] = strenv(ICON)' \
-              manifests/apps/$APP/ingressroute.yaml
+              "$BASE/ingressroute.yaml"
             echo "✅ icon → $ICON"
             CHANGED=true
           fi
 
-          # description 갱신
           if [ -n "$DESC" ]; then
             DESC="$DESC" yq -i '.metadata.annotations["gethomepage.dev/description"] = strenv(DESC)' \
-              manifests/apps/$APP/ingressroute.yaml
+              "$BASE/ingressroute.yaml"
             echo "✅ description → $DESC"
             CHANGED=true
           fi
 
-          # health path 갱신 (3개 probe 모두)
           if [ -n "$HEALTH" ]; then
             for PROBE in startupProbe livenessProbe readinessProbe; do
               HEALTH="$HEALTH" yq -i \
                 ".spec.template.spec.containers[0].${PROBE}.httpGet.path = strenv(HEALTH)" \
-                manifests/apps/$APP/deployment.yaml
+                "$BASE/deployment.yaml"
             done
             echo "✅ health → $HEALTH"
             CHANGED=true
@@ -134,15 +146,8 @@ jobs:
             exit 0
           fi
 
-          # YAML 구문 검증
-          yq eval manifests/apps/$APP/ingressroute.yaml > /dev/null 2>&1 || {
-            echo "::error::ingressroute.yaml YAML 구문 오류"
-            exit 1
-          }
-          yq eval manifests/apps/$APP/deployment.yaml > /dev/null 2>&1 || {
-            echo "::error::deployment.yaml YAML 구문 오류"
-            exit 1
-          }
+          [ -f "$BASE/ingressroute.yaml" ] && yq eval "$BASE/ingressroute.yaml" > /dev/null 2>&1 || true
+          [ -f "$BASE/deployment.yaml" ] && yq eval "$BASE/deployment.yaml" > /dev/null 2>&1 || true
 
           echo "CHANGED=true" >> "$GITHUB_ENV"
 
@@ -150,19 +155,26 @@ jobs:
         if: env.CHANGED == 'true'
         env:
           APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
         run: |
           set -euo pipefail
           git config user.email "deploy-bot@users.noreply.github.com"
           git config user.name "deploy-bot[bot]"
 
-          git add manifests/apps/$APP/
+          if [ -z "$SERVICE" ]; then
+            git add "manifests/apps/$APP/"
+            SCOPE="$APP"
+          else
+            git add "manifests/apps/$APP/services/$SERVICE/"
+            SCOPE="$APP/$SERVICE"
+          fi
 
           if git diff --staged --quiet; then
             echo "⏭️  실제 변경 없음, 커밋 스킵"
             exit 0
           fi
 
-          git commit -m "chore: update $APP config (workflow_dispatch)"
+          git commit -m "chore: update $SCOPE config (workflow_dispatch)"
 
       - name: Push with retry
         uses: ./.github/actions/git-push-retry

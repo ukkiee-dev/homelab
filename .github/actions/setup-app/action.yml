@@ -7,6 +7,7 @@ inputs:
   port:                 { required: false, default: "0", description: "(deprecated) type 기반 자동 매핑으로 대체됨. 값을 넘겨도 무시됨." }
   subdomain:            { required: false, default: "" }
   health:               { required: false }
+  service-name:         { required: false, default: "",  description: "모노레포 서비스 이름. 비면 flat 앱(기존), 있으면 manifests/apps/<app>/services/<service>/ 경로로 생성." }
   app-token:            { required: true }
   tf-cloudflare-token:  { required: true }
   tf-zone-id:           { required: true }
@@ -39,22 +40,32 @@ runs:
     - name: Update apps.json & Terraform
       if: ${{ inputs.type != 'worker' }}
       shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+        SERVICE: ${{ inputs.service-name }}
+        SUBDOMAIN: ${{ inputs.subdomain }}
       run: |
         set -euo pipefail
-        APP="${{ inputs.app-name }}"
-        SUBDOMAIN="${{ inputs.subdomain }}"
+        # apps.json 엔트리 키 규약:
+        #   flat 앱          → "<app>"
+        #   모노레포 서비스  → "<app>-<service>"
+        # 키는 dns.tf for_each의 식별자일 뿐이며 실제 DNS 레코드는 value.subdomain.
+        KEY="$APP"
+        if [ -n "$SERVICE" ]; then
+          KEY="${APP}-${SERVICE}"
+        fi
         APPS_JSON="_homelab/terraform/apps.json"
 
-        EXISTS=$(jq --arg name "$APP" 'has($name)' "$APPS_JSON")
+        EXISTS=$(jq --arg name "$KEY" 'has($name)' "$APPS_JSON")
         if [ "$EXISTS" = "true" ]; then
-          echo "⏭️  apps.json: $APP 이미 존재, 스킵"
+          echo "⏭️  apps.json: $KEY 이미 존재, 스킵"
         else
-          jq --arg name "$APP" --arg sub "$SUBDOMAIN" \
+          jq --arg name "$KEY" --arg sub "$SUBDOMAIN" \
             '. + {($name): {subdomain: $sub}}' \
             "$APPS_JSON" > /tmp/apps.json
           jq empty /tmp/apps.json
           mv /tmp/apps.json "$APPS_JSON"
-          echo "✅ apps.json: $APP ($SUBDOMAIN) 추가됨"
+          echo "✅ apps.json: $KEY ($SUBDOMAIN) 추가됨"
         fi
 
     - name: Setup Terraform
@@ -118,8 +129,9 @@ runs:
       uses: mikefarah/yq@v4
 
     # ── Step 3: k8s 매니페스트 생성 (tunnel 성공 시에만) ─────────
+    # service-name이 비어있으면 flat 앱(기존 동작). 모노레포 서비스는 아래 별도 step.
     - name: Create manifests
-      if: ${{ steps.tunnel.outcome == 'success' || inputs.type == 'worker' }}
+      if: ${{ (steps.tunnel.outcome == 'success' || inputs.type == 'worker') && inputs.service-name == '' }}
       shell: bash
       run: |
         set -euo pipefail
@@ -405,8 +417,326 @@ runs:
           echo "✅ manifests 생성 완료 (type=$TYPE)"
         fi
 
+    # ── Step 3b: 모노레포 서비스 매니페스트 생성 ────────────────
+    # service-name 있을 때만 실행. 같은 namespace(<app>)에 services/<service>/ 추가.
+    # 첫 서비스 추가 시 common/ (프로젝트 shell) 도 자동 생성.
+    - name: Create manifests (monorepo service)
+      if: ${{ (steps.tunnel.outcome == 'success' || inputs.type == 'worker') && inputs.service-name != '' }}
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+        SERVICE: ${{ inputs.service-name }}
+        TYPE: ${{ inputs.type }}
+        SUBDOMAIN: ${{ inputs.subdomain }}
+        DOMAIN: ${{ inputs.domain }}
+        ICON_IN: ${{ inputs.icon }}
+        DESCRIPTION_IN: ${{ inputs.description }}
+        HEALTH_IN: ${{ inputs.health }}
+      run: |
+        set -euo pipefail
+        ICON="${ICON_IN:-mdi-application}"
+        DESCRIPTION="${DESCRIPTION_IN:-$APP/$SERVICE}"
+        HEALTH_PATH="$HEALTH_IN"
+
+        case "$TYPE" in
+          static)
+            PORT=8080
+            MEMORY_REQUEST="64Mi"; MEMORY_LIMIT="128Mi"
+            CPU_REQUEST="50m";     CPU_LIMIT="100m"
+            [ -z "$HEALTH_PATH" ] && HEALTH_PATH="/"
+            ;;
+          web)
+            PORT=3000
+            MEMORY_REQUEST="128Mi"; MEMORY_LIMIT="256Mi"
+            CPU_REQUEST="100m";     CPU_LIMIT="200m"
+            [ -z "$HEALTH_PATH" ] && HEALTH_PATH="/health"
+            ;;
+          worker)
+            PORT=0
+            MEMORY_REQUEST="128Mi"; MEMORY_LIMIT="256Mi"
+            CPU_REQUEST="100m";     CPU_LIMIT="200m"
+            ;;
+          *)
+            echo "❌ Unknown type: $TYPE (static|web|worker)"; exit 1 ;;
+        esac
+
+        PROJECT_DIR="_homelab/manifests/apps/$APP"
+        COMMON_DIR="$PROJECT_DIR/common"
+        SVC_DIR="$PROJECT_DIR/services/$SERVICE"
+
+        if [ -d "$SVC_DIR" ]; then
+          echo "::error::이미 존재하는 서비스: $APP/$SERVICE"
+          exit 1
+        fi
+
+        # ── common/ (프로젝트 shell) — 첫 서비스 추가 시에만 ──
+        if [ ! -d "$COMMON_DIR" ]; then
+          mkdir -p "$COMMON_DIR"
+
+          sed "s/__NAMESPACE__/$APP/g" \
+            _homelab/.github/templates/ghcr-pull-secret.sealed.yaml \
+            > "$COMMON_DIR/ghcr-pull-secret.sealed.yaml"
+
+          cat > "$COMMON_DIR/networkpolicy.yaml" << EOF
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: default-deny-all
+          namespace: $APP
+          labels:
+            app.kubernetes.io/part-of: $APP
+            app.kubernetes.io/component: networking
+            app.kubernetes.io/managed-by: argocd
+        spec:
+          podSelector: {}
+          policyTypes:
+            - Ingress
+            - Egress
+          egress:
+            - to: []
+              ports:
+                - protocol: UDP
+                  port: 53
+                - protocol: TCP
+                  port: 53
+        ---
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: allow-traefik-ingress
+          namespace: $APP
+          labels:
+            app.kubernetes.io/part-of: $APP
+            app.kubernetes.io/component: networking
+            app.kubernetes.io/managed-by: argocd
+        spec:
+          podSelector: {}
+          policyTypes:
+            - Ingress
+          ingress:
+            - from:
+                - namespaceSelector:
+                    matchLabels:
+                      kubernetes.io/metadata.name: traefik-system
+        EOF
+
+          cat > "$COMMON_DIR/kustomization.yaml" << EOF
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+          - ghcr-pull-secret.sealed.yaml
+          - networkpolicy.yaml
+        EOF
+
+          echo "✅ 프로젝트 shell 생성: $COMMON_DIR"
+        else
+          echo "⏭️  common/ 이미 존재, 서비스만 추가"
+        fi
+
+        # ── services/<svc>/ ──────────────────────────────────
+        mkdir -p "$SVC_DIR"
+
+        cat > "$SVC_DIR/deployment.yaml" << EOF
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: $SERVICE
+          namespace: $APP
+          labels:
+            app.kubernetes.io/name: $SERVICE
+            app.kubernetes.io/part-of: $APP
+            app.kubernetes.io/component: $TYPE
+            app.kubernetes.io/version: latest
+            app.kubernetes.io/managed-by: argocd
+        spec:
+          revisionHistoryLimit: 3
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: $SERVICE
+              app.kubernetes.io/part-of: $APP
+          strategy:
+            type: RollingUpdate
+            rollingUpdate:
+              maxUnavailable: 0
+              maxSurge: 1
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/name: $SERVICE
+                app.kubernetes.io/part-of: $APP
+                app.kubernetes.io/version: latest
+            spec:
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                runAsGroup: 1000
+                fsGroup: 1000
+                seccompProfile:
+                  type: RuntimeDefault
+              imagePullSecrets:
+                - name: ghcr-pull-secret
+              volumes:
+                - name: tmp
+                  emptyDir: {}
+              containers:
+                - name: $SERVICE
+                  image: ghcr.io/ukkiee-dev/${APP}-${SERVICE}:latest
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    readOnlyRootFilesystem: true
+                    capabilities:
+                      drop: ["ALL"]
+                  volumeMounts:
+                    - name: tmp
+                      mountPath: /tmp
+        EOF
+
+        if [ "$TYPE" != "worker" ]; then
+          cat >> "$SVC_DIR/deployment.yaml" << EOF
+                  ports:
+                    - name: http
+                      containerPort: $PORT
+                      protocol: TCP
+        EOF
+        fi
+
+        cat >> "$SVC_DIR/deployment.yaml" << EOF
+                  resources:
+                    requests:
+                      memory: "$MEMORY_REQUEST"
+                      cpu: "$CPU_REQUEST"
+                    limits:
+                      memory: "$MEMORY_LIMIT"
+                      cpu: "$CPU_LIMIT"
+        EOF
+
+        if [ "$TYPE" != "worker" ]; then
+          cat >> "$SVC_DIR/deployment.yaml" << EOF
+                  startupProbe:
+                    httpGet:
+                      path: $HEALTH_PATH
+                      port: http
+                    periodSeconds: 5
+                    failureThreshold: 12
+                  livenessProbe:
+                    httpGet:
+                      path: $HEALTH_PATH
+                      port: http
+                    periodSeconds: 20
+                    timeoutSeconds: 5
+                    failureThreshold: 5
+                  readinessProbe:
+                    httpGet:
+                      path: $HEALTH_PATH
+                      port: http
+                    periodSeconds: 10
+                    timeoutSeconds: 5
+                    failureThreshold: 3
+        EOF
+        fi
+
+        # Service + IngressRoute (static/web만)
+        if [ "$TYPE" = "static" ] || [ "$TYPE" = "web" ]; then
+          cat > "$SVC_DIR/service.yaml" << EOF
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: $SERVICE
+          namespace: $APP
+          labels:
+            app.kubernetes.io/name: $SERVICE
+            app.kubernetes.io/part-of: $APP
+        spec:
+          selector:
+            app.kubernetes.io/name: $SERVICE
+            app.kubernetes.io/part-of: $APP
+          ports:
+            - port: $PORT
+              targetPort: $PORT
+        EOF
+
+          cat > "$SVC_DIR/ingressroute.yaml" << EOF
+        apiVersion: traefik.io/v1alpha1
+        kind: IngressRoute
+        metadata:
+          name: $SERVICE
+          namespace: $APP
+          labels:
+            app.kubernetes.io/name: $SERVICE
+            app.kubernetes.io/part-of: $APP
+          annotations:
+            gethomepage.dev/enabled: "true"
+            gethomepage.dev/group: "Apps"
+            gethomepage.dev/name: "$APP/$SERVICE"
+            gethomepage.dev/icon: "$ICON"
+            gethomepage.dev/href: "https://$SUBDOMAIN.$DOMAIN"
+            gethomepage.dev/description: "$DESCRIPTION"
+            gethomepage.dev/pod-selector: "app.kubernetes.io/name=$SERVICE"
+        spec:
+          entryPoints:
+            - web
+            - websecure
+          routes:
+            - match: Host(\`$SUBDOMAIN.$DOMAIN\`)
+              kind: Rule
+              middlewares:
+                - name: security-headers
+                  namespace: traefik-system
+                - name: gzip
+                  namespace: traefik-system
+              services:
+                - name: $SERVICE
+                  port: $PORT
+        EOF
+        fi
+
+        # 서비스 kustomization
+        if [ "$TYPE" = "static" ] || [ "$TYPE" = "web" ]; then
+          cat > "$SVC_DIR/kustomization.yaml" << EOF
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+          - deployment.yaml
+          - service.yaml
+          - ingressroute.yaml
+        EOF
+        else
+          cat > "$SVC_DIR/kustomization.yaml" << EOF
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+          - deployment.yaml
+        EOF
+        fi
+
+        # 루트 kustomization: 최초 생성 또는 services/<svc> 추가
+        ROOT_KUST="$PROJECT_DIR/kustomization.yaml"
+        if [ ! -f "$ROOT_KUST" ]; then
+          cat > "$ROOT_KUST" << EOF
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+          - common
+          - services/$SERVICE
+        EOF
+          echo "✅ 루트 kustomization 신규 생성"
+        else
+          if ! yq eval '.resources[]' "$ROOT_KUST" | grep -q "^services/${SERVICE}$"; then
+            yq eval -i ".resources += [\"services/$SERVICE\"]" "$ROOT_KUST"
+            echo "✅ 루트 kustomization에 services/$SERVICE 추가"
+          fi
+        fi
+
+        # YAML 들여쓰기 정규화 (heredoc 8스페이스 제거)
+        for f in "$COMMON_DIR"/*.yaml "$SVC_DIR"/*.yaml "$ROOT_KUST"; do
+          [ -f "$f" ] && yq eval -i '.' "$f"
+        done
+
+        echo "✅ monorepo manifests 생성 완료: $APP/$SERVICE (type=$TYPE)"
+
     - name: Create ArgoCD Application
-      if: ${{ steps.tunnel.outcome == 'success' || inputs.type == 'worker' }}
+      if: ${{ (steps.tunnel.outcome == 'success' || inputs.type == 'worker') && inputs.service-name == '' }}
       shell: bash
       run: |
         set -euo pipefail
@@ -448,6 +778,58 @@ runs:
         # YAML 들여쓰기 정규화
         yq eval -i '.' _homelab/argocd/applications/apps/$APP.yaml
         echo "✅ ArgoCD Application 생성 완료"
+
+    # ── ArgoCD Application (monorepo) — 프로젝트 shell 최초 생성 시에만 ──
+    # path는 manifests/apps/<app> 루트. 서비스 추가 시 ArgoCD가 루트 kustomization을
+    # 따라가 자동 감지하므로 Application은 한 번만 만들면 된다.
+    - name: Create ArgoCD Application (monorepo)
+      if: ${{ (steps.tunnel.outcome == 'success' || inputs.type == 'worker') && inputs.service-name != '' }}
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+      run: |
+        set -euo pipefail
+        APP_FILE="_homelab/argocd/applications/apps/$APP.yaml"
+        if [ -f "$APP_FILE" ]; then
+          echo "⏭️  ArgoCD Application 이미 존재 ($APP), 스킵"
+          exit 0
+        fi
+
+        cat > "$APP_FILE" << EOF
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: $APP
+          namespace: argocd
+          finalizers:
+            - resources-finalizer.argocd.argoproj.io
+          annotations:
+            argocd.argoproj.io/sync-wave: "0"
+        spec:
+          project: default
+          source:
+            repoURL: https://github.com/ukkiee-dev/homelab.git
+            targetRevision: main
+            path: manifests/apps/$APP
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: $APP
+          syncPolicy:
+            automated:
+              prune: true
+              selfHeal: true
+            syncOptions:
+              - CreateNamespace=true
+            retry:
+              limit: 3
+              backoff:
+                duration: 5s
+                factor: 2
+                maxDuration: 3m
+        EOF
+
+        yq eval -i '.' "$APP_FILE"
+        echo "✅ ArgoCD Application 생성 완료 (monorepo shell)"
 
     # ── Step 4: git commit & push (terraform 완료 후) ─────────────
     - name: Commit & Push

@@ -6,6 +6,11 @@ on:
       app-name:
         required: true
         type: string
+      service:
+        description: "모노레포 서비스 이름. 비면 전체 제거(flat 또는 프로젝트 전체), 채우면 해당 서비스만 제거."
+        required: false
+        type: string
+        default: ""
     secrets:
       APP_ID:
         required: true
@@ -53,28 +58,105 @@ jobs:
           repository: ukkiee-dev/homelab
           token: ${{ steps.app-token.outputs.token }}
 
-      # ── Step 1: apps.json 확인 & 제거 ──────────────────────────
-      - name: Check and remove from apps.json
+      # ── Step 1: 모드 감지 + apps.json 제거 + 영향 리소스 수집 ──
+      # 3-way 분기:
+      #   flat     : manifests/apps/<app>/deployment.yaml (services/ 없음)
+      #   service  : input service 채움 → 그 서비스만 제거, shell 유지
+      #   project  : service 비움 + manifests/apps/<app>/services/ 존재 → 전체 프로젝트 제거
+      - name: Detect mode & remove from apps.json
         id: remove
         env:
           APP_NAME: ${{ inputs.app-name }}
+          SERVICE_IN: ${{ inputs.service }}
+          TF_DOMAIN: ${{ secrets.TF_DOMAIN }}
         run: |
           set -euo pipefail
+          APP="$APP_NAME"
+          SERVICE="$SERVICE_IN"
+          PROJECT_DIR="manifests/apps/$APP"
+          APPS_JSON="terraform/apps.json"
 
-          IN_APPS_JSON=$(jq --arg name "$APP_NAME" 'has($name)' terraform/apps.json)
-          echo "in_apps_json=$IN_APPS_JSON" >> $GITHUB_OUTPUT
-
-          SUBDOMAIN=""
-          if [ "$IN_APPS_JSON" = "true" ]; then
-            SUBDOMAIN=$(jq -r --arg name "$APP_NAME" '.[$name].subdomain // empty' terraform/apps.json)
-            jq --arg name "$APP_NAME" 'del(.[$name])' terraform/apps.json > /tmp/apps.json
-            jq empty /tmp/apps.json
-            mv /tmp/apps.json terraform/apps.json
-            echo "apps.json에서 $APP_NAME 제거 (subdomain: $SUBDOMAIN)"
+          # 모드 감지 (우선순위 중요)
+          if [ -n "$SERVICE" ]; then
+            MODE="service"
+          elif [ -d "$PROJECT_DIR/services" ]; then
+            MODE="project"
+          elif [ -f "$PROJECT_DIR/deployment.yaml" ] || [ -f "$PROJECT_DIR/kustomization.yaml" ]; then
+            MODE="flat"
           else
-            echo "apps.json에 $APP_NAME 없음 (worker 타입), terraform 스킵"
+            MODE="missing"
+            echo "⚠️  manifests/apps/$APP 없음 — 이미 제거된 상태일 수 있음. 그래도 apps.json/tunnel 정리 시도."
           fi
-          echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
+          echo "mode=$MODE"
+
+          # mode별 제거 대상 키 + GHCR 패키지 수집
+          KEYS=()
+          PKGS=()
+          case "$MODE" in
+            flat|missing)
+              KEYS+=("$APP")
+              PKGS+=("$APP")
+              ;;
+            service)
+              KEYS+=("${APP}-${SERVICE}")
+              PKGS+=("${APP}-${SERVICE}")
+              ;;
+            project)
+              if [ -d "$PROJECT_DIR/services" ]; then
+                for svc_dir in "$PROJECT_DIR/services"/*/; do
+                  [ -d "$svc_dir" ] || continue
+                  svc=$(basename "$svc_dir")
+                  KEYS+=("${APP}-${svc}")
+                  PKGS+=("${APP}-${svc}")
+                done
+              fi
+              # legacy <app> 엔트리가 apps.json에 있으면 함께 정리
+              KEYS+=("$APP")
+              ;;
+          esac
+
+          # apps.json에서 해당 키 제거 + hostname 수집
+          IN_APPS_JSON=false
+          HOSTNAMES_JSON="[]"
+          for key in "${KEYS[@]}"; do
+            exists=$(jq --arg name "$key" 'has($name)' "$APPS_JSON")
+            if [ "$exists" = "true" ]; then
+              sub=$(jq -r --arg name "$key" '.[$name].subdomain // empty' "$APPS_JSON")
+              if [ -n "$sub" ] && [ -n "$TF_DOMAIN" ]; then
+                HOSTNAMES_JSON=$(jq --arg h "${sub}.${TF_DOMAIN}" '. + [$h]' <<< "$HOSTNAMES_JSON")
+              fi
+              jq --arg name "$key" 'del(.[$name])' "$APPS_JSON" > /tmp/apps.json
+              jq empty /tmp/apps.json
+              mv /tmp/apps.json "$APPS_JSON"
+              IN_APPS_JSON=true
+              echo "apps.json: '$key' 제거 (subdomain: $sub)"
+            fi
+          done
+
+          # ArgoCD Application 삭제 여부: service 모드만 유지
+          DELETE_APP=true
+          if [ "$MODE" = "service" ]; then
+            DELETE_APP=false
+          fi
+
+          # Step outputs (다음 step들이 배열을 JSON 문자열로 파싱)
+          PKGS_JSON=$(printf '%s\n' "${PKGS[@]}" | jq -R . | jq -sc .)
+          HOSTNAMES_OUT=$(jq -c . <<< "$HOSTNAMES_JSON")
+
+          {
+            echo "mode=$MODE"
+            echo "in_apps_json=$IN_APPS_JSON"
+            echo "delete_application=$DELETE_APP"
+            echo "hostnames=$HOSTNAMES_OUT"
+            echo "ghcr_packages=$PKGS_JSON"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "── summary ─────────────────────────"
+          echo "  mode             : $MODE"
+          echo "  in_apps_json     : $IN_APPS_JSON"
+          echo "  delete_application: $DELETE_APP"
+          echo "  hostnames        : $HOSTNAMES_OUT"
+          echo "  ghcr_packages    : $PKGS_JSON"
 
       # ── Step 2: Terraform (apps.json에 있던 앱만) ──────────────
       - name: Setup Terraform
@@ -118,7 +200,7 @@ jobs:
           TF_VAR_account_id:           ${{ secrets.TF_ACCOUNT_ID }}
           TF_VAR_domain:               ${{ secrets.TF_DOMAIN }}
 
-      # ── Step 2.5: Tunnel Ingress 제거 ──────────────────────────
+      # ── Step 2.5: Tunnel Ingress 제거 (hostnames 배열 loop) ────
       - name: Remove tunnel ingress
         if: steps.remove.outputs.in_apps_json == 'true'
         continue-on-error: true
@@ -126,34 +208,93 @@ jobs:
           CF_TOKEN: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
           ACCOUNT_ID: ${{ secrets.TF_ACCOUNT_ID }}
           TUNNEL_ID: ${{ secrets.TF_TUNNEL_ID }}
-          TUNNEL_HOSTNAME: "${{ steps.remove.outputs.subdomain }}.${{ secrets.TF_DOMAIN }}"
+          HOSTNAMES_JSON: ${{ steps.remove.outputs.hostnames }}
         run: |
-          bash .github/scripts/manage-tunnel-ingress.sh remove "$TUNNEL_HOSTNAME"
+          set -euo pipefail
+          COUNT=$(jq 'length' <<< "$HOSTNAMES_JSON")
+          if [ "$COUNT" -eq 0 ]; then
+            echo "제거할 hostname 없음"
+            exit 0
+          fi
+          for i in $(seq 0 $((COUNT - 1))); do
+            HOSTNAME=$(jq -r ".[$i]" <<< "$HOSTNAMES_JSON")
+            [ -z "$HOSTNAME" ] && continue
+            echo "tunnel ingress 제거: $HOSTNAME"
+            bash .github/scripts/manage-tunnel-ingress.sh remove "$HOSTNAME" || echo "⚠️  '$HOSTNAME' 제거 실패 (계속 진행)"
+          done
 
-      # ── Step 2.6: GHCR 패키지 삭제 ────────────────────────────
-      - name: Delete GHCR package
+      # ── Step 2.6: GHCR 패키지 삭제 (다중 패키지 loop) ─────────
+      - name: Delete GHCR packages
         continue-on-error: true
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          APP_NAME: ${{ inputs.app-name }}
+          PKGS_JSON: ${{ steps.remove.outputs.ghcr_packages }}
         run: |
-          gh api "orgs/ukkiee-dev/packages/container/${APP_NAME}" -X DELETE \
-            && echo "GHCR 패키지 삭제 완료" \
-            || echo "GHCR 패키지 없음 또는 권한 부족 (무시)"
+          set -euo pipefail
+          COUNT=$(jq 'length' <<< "$PKGS_JSON")
+          for i in $(seq 0 $((COUNT - 1))); do
+            PKG=$(jq -r ".[$i]" <<< "$PKGS_JSON")
+            [ -z "$PKG" ] && continue
+            if gh api "orgs/ukkiee-dev/packages/container/${PKG}" -X DELETE 2>/dev/null; then
+              echo "✅ GHCR 패키지 삭제: $PKG"
+            else
+              echo "⏭️  GHCR 패키지 없음 또는 권한 부족 (무시): $PKG"
+            fi
+          done
 
-      # ── Step 3: 매니페스트 제거 & git push ─────────────────────
+      # ── Step 3a: yq 설치 (kustomization 수정용) ────────────────
+      - name: Install yq
+        uses: mikefarah/yq@v4
+
+      # ── Step 3: 매니페스트 제거 (mode별 분기) ──────────────────
       - name: Remove manifests & ArgoCD Application
         env:
           APP_NAME: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
+          MODE: ${{ steps.remove.outputs.mode }}
+          DELETE_APP: ${{ steps.remove.outputs.delete_application }}
         run: |
           set -euo pipefail
-          rm -rf "manifests/apps/${APP_NAME}"
-          rm -f "argocd/applications/apps/${APP_NAME}.yaml"
-          echo "매니페스트 제거 완료"
+          APP="$APP_NAME"
+          PROJECT_DIR="manifests/apps/$APP"
+
+          case "$MODE" in
+            flat|project|missing)
+              rm -rf "$PROJECT_DIR"
+              echo "매니페스트 디렉토리 제거: $PROJECT_DIR"
+              ;;
+            service)
+              SVC_DIR="$PROJECT_DIR/services/$SERVICE"
+              if [ -d "$SVC_DIR" ]; then
+                rm -rf "$SVC_DIR"
+                echo "서비스 디렉토리 제거: $SVC_DIR"
+              else
+                echo "⚠️  $SVC_DIR 없음 (이미 제거됨?)"
+              fi
+              # 루트 kustomization.yaml에서 services/<service> 엔트리 제거
+              ROOT_KUST="$PROJECT_DIR/kustomization.yaml"
+              if [ -f "$ROOT_KUST" ]; then
+                SERVICE="$SERVICE" yq eval -i \
+                  'del(.resources[] | select(. == "services/" + strenv(SERVICE)))' \
+                  "$ROOT_KUST"
+                echo "루트 kustomization에서 services/$SERVICE 엔트리 제거"
+              fi
+              ;;
+          esac
+
+          # ArgoCD Application yaml: service 모드에서는 유지
+          if [ "$DELETE_APP" = "true" ]; then
+            rm -f "argocd/applications/apps/${APP}.yaml"
+            echo "ArgoCD Application yaml 제거: $APP"
+          else
+            echo "ArgoCD Application yaml 유지 (service 모드)"
+          fi
 
       - name: Commit & Push
         env:
           APP_NAME: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
+          MODE: ${{ steps.remove.outputs.mode }}
         run: |
           set -euo pipefail
           git config user.email "deploy-bot@users.noreply.github.com"
@@ -165,7 +306,11 @@ jobs:
             exit 0
           fi
 
-          git commit -m "chore: remove ${APP_NAME}"
+          case "$MODE" in
+            service) SCOPE="${APP_NAME}/${SERVICE}" ;;
+            *)       SCOPE="${APP_NAME}" ;;
+          esac
+          git commit -m "chore: remove ${SCOPE} (${MODE})"
 
       - name: Push with retry
         uses: ./.github/actions/git-push-retry
@@ -173,7 +318,9 @@ jobs:
       # ── Step 3.5: ArgoCD Application 삭제 (REST API) ───────────
       # root app이 prune: false이므로 git에서 YAML 삭제해도 Application CR이 자동 제거되지 않음
       # ArgoCD REST API로 삭제 (GitHub-hosted runner에서도 동작)
+      # service 모드에서는 프로젝트 Application 유지하므로 skip
       - name: Delete ArgoCD Application via API
+        if: steps.remove.outputs.delete_application == 'true'
         continue-on-error: true
         env:
           ARGOCD_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}

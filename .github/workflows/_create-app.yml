@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: "mdi-application"
+      service-name:
+        description: "모노레포 서비스 이름. 비면 flat 앱(기존), 채우면 manifests/apps/<app>/services/<service>/ 구조로 생성."
+        required: false
+        type: string
+        default: ""
     secrets:
       APP_ID:
         required: true
@@ -89,13 +94,25 @@ jobs:
       - name: Check app does not already exist
         env:
           APP_NAME: ${{ inputs.app-name }}
+          SERVICE_NAME: ${{ inputs.service-name }}
           TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          # service-name 비었을 때: flat 앱. manifests/apps/<app> 디렉토리가 있으면 중복 에러.
+          # service-name 채웠을 때: 모노레포 서비스. 프로젝트 디렉토리는 존재해도 OK.
+          #   단 manifests/apps/<app>/services/<service> 는 없어야 함.
+          if [ -z "$SERVICE_NAME" ]; then
+            TARGET="manifests/apps/${APP_NAME}"
+            ERR_MSG="${APP_NAME}은 이미 존재하는 앱입니다. teardown 후 다시 실행하세요."
+          else
+            TARGET="manifests/apps/${APP_NAME}/services/${SERVICE_NAME}"
+            ERR_MSG="${APP_NAME}/services/${SERVICE_NAME}은 이미 존재하는 서비스입니다."
+          fi
+
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $TOKEN" \
-            "https://api.github.com/repos/ukkiee-dev/homelab/contents/manifests/apps/${APP_NAME}")
+            "https://api.github.com/repos/ukkiee-dev/homelab/contents/${TARGET}")
           if [ "$STATUS" = "200" ]; then
-            echo "::error::${APP_NAME}은 이미 존재하는 앱입니다. teardown 후 다시 실행하세요."
+            echo "::error::${ERR_MSG}"
             exit 1
           fi
 
@@ -104,10 +121,18 @@ jobs:
         id: resolve
         env:
           APP_NAME: ${{ inputs.app-name }}
+          SERVICE_NAME: ${{ inputs.service-name }}
           SUBDOMAIN: ${{ inputs.subdomain }}
         run: |
+          # 기본값:
+          #   flat 앱    → <app>
+          #   모노레포   → <app>-<service>   (사용자가 subdomain 명시하면 그대로 사용)
           if [ -z "$SUBDOMAIN" ]; then
-            SUBDOMAIN="$APP_NAME"
+            if [ -n "$SERVICE_NAME" ]; then
+              SUBDOMAIN="${APP_NAME}-${SERVICE_NAME}"
+            else
+              SUBDOMAIN="$APP_NAME"
+            fi
           fi
           echo "subdomain=$SUBDOMAIN" >> "$GITHUB_OUTPUT"
 
@@ -134,6 +159,7 @@ jobs:
           health: ${{ inputs.app-health }}
           icon: ${{ inputs.default-icon }}
           description: ${{ steps.desc.outputs.description }}
+          service-name: ${{ inputs.service-name }}
           app-token: ${{ steps.app-token.outputs.token }}
           tf-cloudflare-token: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
           tf-zone-id: ${{ secrets.TF_ZONE_ID }}

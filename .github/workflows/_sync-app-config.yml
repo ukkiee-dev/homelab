@@ -6,6 +6,11 @@ on:
       app-name:
         required: true
         type: string
+      service:
+        description: "모노레포 서비스 이름. 비면 flat 경로(기존), 채우면 services/<service>/... 에 적용."
+        required: false
+        type: string
+        default: ""
       health:
         required: false
         type: string
@@ -54,41 +59,46 @@ jobs:
       - name: Update manifests
         env:
           APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
           ICON: ${{ inputs.icon }}
           DESC: ${{ inputs.description }}
           HEALTH: ${{ inputs.health }}
         run: |
           set -euo pipefail
 
-          if [ ! -d "manifests/apps/$APP" ]; then
-            echo "::error::manifests/apps/$APP 디렉토리가 존재하지 않습니다"
+          # service 비면 flat, 채우면 services/<svc>/ 경로
+          if [ -z "$SERVICE" ]; then
+            BASE="manifests/apps/$APP"
+          else
+            BASE="manifests/apps/$APP/services/$SERVICE"
+          fi
+
+          if [ ! -d "$BASE" ]; then
+            echo "::error::$BASE 디렉토리가 존재하지 않습니다"
             exit 1
           fi
 
           CHANGED=false
 
-          # icon 갱신
-          if [ -n "$ICON" ] && [ -f "manifests/apps/$APP/ingressroute.yaml" ]; then
+          if [ -n "$ICON" ] && [ -f "$BASE/ingressroute.yaml" ]; then
             ICON="$ICON" yq -i '.metadata.annotations["gethomepage.dev/icon"] = strenv(ICON)' \
-              manifests/apps/$APP/ingressroute.yaml
+              "$BASE/ingressroute.yaml"
             echo "icon -> $ICON"
             CHANGED=true
           fi
 
-          # description 갱신
-          if [ -n "$DESC" ] && [ -f "manifests/apps/$APP/ingressroute.yaml" ]; then
+          if [ -n "$DESC" ] && [ -f "$BASE/ingressroute.yaml" ]; then
             DESC="$DESC" yq -i '.metadata.annotations["gethomepage.dev/description"] = strenv(DESC)' \
-              manifests/apps/$APP/ingressroute.yaml
+              "$BASE/ingressroute.yaml"
             echo "description -> $DESC"
             CHANGED=true
           fi
 
-          # health path 갱신 (3개 probe 모두, path만 변경 — port는 기존 값 유지)
-          if [ -n "$HEALTH" ]; then
+          if [ -n "$HEALTH" ] && [ -f "$BASE/deployment.yaml" ]; then
             for PROBE in startupProbe livenessProbe readinessProbe; do
               HEALTH="$HEALTH" yq -i \
                 ".spec.template.spec.containers[0].${PROBE}.httpGet.path = strenv(HEALTH)" \
-                manifests/apps/$APP/deployment.yaml
+                "$BASE/deployment.yaml"
             done
             echo "health -> $HEALTH"
             CHANGED=true
@@ -105,20 +115,27 @@ jobs:
         if: env.CHANGED == 'true'
         env:
           APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
         run: |
           set -euo pipefail
           git config user.email "deploy-bot@users.noreply.github.com"
           git config user.name "deploy-bot[bot]"
 
-          git add manifests/apps/$APP/
+          # 변경 범위: flat이면 앱 디렉토리, 모노레포면 services/<svc>/
+          if [ -z "$SERVICE" ]; then
+            git add "manifests/apps/$APP/"
+            SCOPE="$APP"
+          else
+            git add "manifests/apps/$APP/services/$SERVICE/"
+            SCOPE="$APP/$SERVICE"
+          fi
 
-          # no-diff guard: 동일 값으로 sync 시도 시 불필요한 커밋 방지
           if git diff --staged --quiet; then
             echo "실제 변경 없음, 커밋 스킵"
             exit 0
           fi
 
-          git commit -m "chore: sync $APP config"
+          git commit -m "chore: sync $SCOPE config"
 
       - name: Push with retry
         uses: ./.github/actions/git-push-retry
