@@ -1,12 +1,22 @@
-# Cloudflare Terraform Provider v4.52.7 → v5.18.0 업그레이드 Runbook
+# Cloudflare Terraform Provider v4.52.7 → v5.19.0-beta.5 업그레이드 Runbook
 
 | 항목 | 값 |
 |------|-----|
 | **심각도** | High (IaC state 조작 포함, 롤백 경로 필수) |
-| **예상 소요** | 4.5 ~ 6시간 (migration 본체) + 1 ~ 2시간 (R2 신규, 별건 PR) |
-| **최종 수정** | 2026-04-18 |
+| **예상 소요** | 실제 홈랩 수행 ~3시간 (포함 시나리오 B/C 분기) + 1 ~ 2시간 (R2 신규, 별건 PR) |
+| **최종 수정** | 2026-04-19 (홈랩 실제 수행 결과 반영) |
+| **상태** | ✅ 완료 (commit `22d93a9`, `f322ef4`, `b45b50e`, `69595a2`) |
 | **관련 서비스** | Cloudflare DNS / WAF / Cache / Ratelimit rules (zone `ukkiee.dev`), Terraform R2 state backend |
 | **카테고리** | 인프라 관리 (major 업그레이드) |
+
+> **⚠️ 수행 결과 업데이트 (2026-04-19)**
+>
+> 본 Runbook은 최초 계획서로 작성되었으나, 실제 수행에서 다음 치명적 gotcha 확인되어 v5.18.0 → **v5.19.0-beta.5** 로 타겟 버전 변경됨:
+> 1. v5.18 provider는 `cloudflare_record` state 읽기 실패 ("no schema available") — DNS MoveResourceState 미구현
+> 2. v5.18 provider는 `cloudflare_ruleset`의 `action_parameters` JSON 파싱 에러 — state upgrader 범위 부족
+> 3. tf-migrate가 생성하는 `moved` block은 타입 rename에 사용 불가 — Terraform 1.5.7의 "Resource type mismatch" 에러
+>
+> **실제 안정 경로**는 섹션 8 (Known Gotchas) 및 부록 B (홈랩 실제 수행 결과) 참조.
 
 ---
 
@@ -1017,20 +1027,100 @@ Migration verified: plan clean, dashboard unchanged, DNS resolving
 
 ## 8. Known Gotchas
 
-### 8.1 v5.1 ~ v5.4 경유 금지 — v5.18 직접 pin
+> 2026-04-19 실제 수행 중 발견된 gotcha를 8.1 ~ 8.10에 우선 기록. 기존 계획 시점 gotcha는 8.11 이하에 보존.
+
+### 8.1 [실측] tf-migrate가 생성한 `moved` block은 타입 rename에 Terraform이 거부
+
+- tf-migrate v1.0.0-beta.11은 `dns.tf`에 다음 blocks 자동 생성:
+  ```hcl
+  moved {
+    from = cloudflare_record.apps
+    to   = cloudflare_dns_record.apps
+  }
+  ```
+- **Terraform 1.5.7 에러**: `Resource type mismatch — moved block from 'cloudflare_record' to 'cloudflare_dns_record'`
+- **원인**: Terraform의 `moved` block은 **동일 타입 내 address 변경만 지원**. 타입 rename은 provider의 `MoveResourceState` 기능이 담당
+- **조치**: tf-migrate 결과에서 `moved` block **반드시 수동 제거**. 커밋 참조: `f322ef4`
+
+### 8.2 [실측] Cloudflare provider는 `cloudflare_record` → `cloudflare_dns_record` MoveResourceState 미구현
+
+- v5.18.0, v5.19.0-beta.5 모두 DNS 타입 rename 자동 state 변환 **없음**
+- **증상 1**: `Warning: No resource schema found for cloudflare_record when decoding prior state`
+- **증상 2**: Plan 결과 `1 to add` (create-only) → state에 orphan 발생
+- **조치**: DNS record는 **수동 `state rm` + `import`** 필수:
+  ```bash
+  terraform state rm 'cloudflare_record.apps["<key>"]'
+  terraform import 'cloudflare_dns_record.apps["<key>"]' "${ZONE_ID}/${RECORD_ID}"
+  ```
+
+### 8.3 [실측] v5.18 provider는 `cloudflare_ruleset` UpgradeResourceState 미지원 → v5.19+ 필수
+
+- v4 state의 `action_parameters` list 구조 → v5 object 스키마 변환을 **v5.18의 state upgrader가 못함**
+- **에러**:
+  ```
+  AttributeName("rules").ElementKeyInt(0).AttributeName("action_parameters"):
+    invalid JSON, expected "{", got "["
+  ```
+- **조치**: v5.19.0-beta.5 이상 사용. v5.19에서 **ruleset 포함 61 리소스** automatic state upgrader 추가됨
+- 홈랩 선택: v5.19.0-beta.5 정확 pin (commit `b45b50e`)
+- **Why (memory에 기록)**: v5는 SDKv2 → Plugin Framework ground-up rewrite라 state migration 자동화가 점진적 롤아웃 중. beta가 계속 개선되므로 다음 minor/patch 업그레이드 시에도 `MoveResourceState` 구현 여부 우선 확인 필요
+
+### 8.4 [실측] v4 → v5 경로는 v5.18 스킵 불가피 — v5.19+ 직행 권장
+
+- 계획 단계에서는 "v5.1~v5.4 crash 방지를 위해 v5.18 직접 pin" 이었으나, 실제 v5.18이 ruleset state upgrader 부족으로 사용 불가 판명
+- **교정된 권장 경로**: v4.52.7 → **v5.19.0-beta.5** (또는 v5.19 GA 이후 stable)
+- 차기 migration 계획 시 **v5.19.x GA 또는 beta 최신 버전** 직행. v5.18은 매개 단계로도 사용 금지
+
+### 8.5 [실측] `sensitive` marking은 cosmetic drift로 나타날 수 있음
+
+- v5.19.0-beta.5 apply 시 `api_token` 등 sensitive 필드에 대해 "update in-place" 표시
+- 실제 값 변경 없이 Terraform의 sensitive metadata 업데이트만 적용
+- **조치**: destroy 0 + change 1 이하 확인 후 apply 진행 (홈랩 검증 완료)
+
+### 8.6 [실측] v4 drift는 반드시 migration 시작 전 해소
+
+- 홈랩의 경우 `argocd`/`immich` DNS 레코드와 `security_headers` ruleset에 3건의 drift 존재했음 (commit `69595a2`)
+- **왜 선행이 중요한가**: migration 중 drift가 섞이면 "어떤 변경이 migration 탓인지 원인 분리 불가". 즉 v5 plan이 예상 외 결과 냈을 때 v4 drift 때문인지 v5 schema 차이 때문인지 구별 못함
+- **조치**: `apps.json`에서 폐기 앱 엔트리 완전 제거, Dashboard-외부 관리 DNS는 Terraform에서 제외
+
+### 8.7 [실측] tf-migrate 사용 시 pristine clone이 안전
+
+- tf-migrate는 HCL을 변환하면서 주석을 **일부 유실**. 현재 작업 브랜치에서 직접 실행하면 주석 손실
+- **실제 수행**: `/tmp/cloudflare-v5-migration-workspace/` 에 별도 clone → tf-migrate 실행 → diff를 작업 브랜치에 수동 복구 + 주석 재입력
+- **조치**: tf-migrate 실행 환경을 격리 → HCL diff만 cherry-pick
+
+### 8.8 [실측] ArgoCD AppProject가 PV/StorageClass cluster-scoped 허용 누락 시 migration 무관하게 sync 실패
+
+- v5 migration과 직접 관련은 없으나 같은 주간 작업에서 발견 (commit `ec4d192`)
+- PostgreSQL 백업용 PersistentVolume + StorageClass를 추가하자 AppProject `apps`의 `clusterResourceWhitelist`에 `PersistentVolume` + `StorageClass` 누락으로 ArgoCD sync 실패
+- **교훈**: cluster-scoped 리소스 (PV, StorageClass, CRD) 추가 전 AppProject whitelist 점검이 사전 필수
+
+### 8.9 [실측] `cloudflare_dns_record.name` zone-relative 동작은 v5에서도 호환
+
+- 계획 시 8.7 (v1 runbook)에서 "FQDN 명시 필요 가능성" 우려했으나 실제 `name = each.value.subdomain` + `zone_id` 조합이 v5.19.0-beta.5에서 정상 동작 (name drift 없음)
+- **조치**: FQDN 명시 전환 **불필요**. 기존 zone-relative 유지
+
+### 8.10 [실측] R2 backend state 저장 시 `endpoint` env/flag 주입 의존성
+
+- `backend.tf`에 endpoint 하드코딩 안 됨 → `terraform init -backend-config=...` 또는 `AWS_ENDPOINT_URL_S3` env 필요
+- **조치**: migration 중 init 재실행할 때마다 backend-config 주입 스크립트 유지 (shell alias 또는 Makefile 타겟)
+
+---
+
+### 8.11 v5.1 ~ v5.4 경유 금지 — v5.18 직접 pin
 
 - v5.1.0 ~ v5.4.0 기간에 `http_request_cache_settings` phase + `set_cache_settings` action 조합이 "Plugin did not respond" 크래시 (GitHub Issue #5599)
 - 홈랩 `cloudflare_ruleset.cache_rules` 가 정확히 이 패턴
 - v5.8.2 이후 해결. v5.18 에서는 정상
 - **조치**: `version = "= 5.18.0"` 정확 pin. 중간 버전 stepping 금지
 
-### 8.2 `~> 5.18` 금지
+### 8.12 `~> 5.18` 금지
 
 - `~>` 는 5.x 마이너 업데이트 허용 → v5.19, v5.20 등이 떠오르면 자동 갱신
 - v5.x 마이너에 breaking change 빈발 (v5.4, v5.6, v5.13)
 - **조치**: 반드시 `= 5.18.0` 정확 pin. `~> 5.18` 또는 `~> 5.0` 금지
 
-### 8.3 Renovate CF provider v5.x auto-merge 제외 필요
+### 8.13 Renovate CF provider v5.x auto-merge 제외 필요
 
 - Renovate 가 v5.18.0 → v5.19.0 자동 PR 생성 + auto-merge 하면 예상치 못한 regression
 - **조치**: Renovate 설정 (`.github/renovate.json` 또는 `renovate.json`) 에 cloudflare provider 예외 추가:
@@ -1048,7 +1138,7 @@ Migration verified: plan clean, dashboard unchanged, DNS resolving
   ```
 - **이 Runbook 의 scope 는 아님**. 후속 별건 PR. Renovate 설정이 없으면 더 문제 아니고, 있으면 별건으로 조치.
 
-### 8.4 Ruleset recurring drift 가능성
+### 8.14 Ruleset recurring drift 가능성
 
 - v5.0 ~ v5.8 시기 `cloudflare_ruleset` 의 `preserve_duplicates`, `raw_response_fields`, 특정 `action_parameters` 필드에서 반복 drift 보고
 - v5.18 에서 대부분 해결되었으나 일부 잔존 가능
@@ -1057,19 +1147,19 @@ Migration verified: plan clean, dashboard unchanged, DNS resolving
   2. 같은 drift 가 3회 연속 나오면 HCL 을 v5 정확 schema 로 재조정
   3. 그래도 안 되면 임시 `lifecycle { ignore_changes = [...] }`. 근본 해결은 v5.19+ 에서 재검토
 
-### 8.5 `cloudflare_r2_bucket_lifecycle` 는 import 미지원
+### 8.15 `cloudflare_r2_bucket_lifecycle` 는 import 미지원
 
 - Phase 5 에서 R2 lifecycle 추가 시 **처음부터 Terraform 으로만** 생성
 - 이미 Cloudflare Dashboard 에서 lifecycle rule 을 수동 추가했다면, Terraform 도입 전 Dashboard 에서 제거 후 Terraform 으로 재생성
 - CORS (`cloudflare_r2_bucket_cors`) 도 동일 제약
 
-### 8.6 R2 API token 권한 추가는 Dashboard 수동
+### 8.16 R2 API token 권한 추가는 Dashboard 수동
 
 - Terraform 으로 API token 자체를 관리하지 않음 (`cloudflare_api_token` 미사용)
 - R2 리소스 추가 전 Cloudflare Dashboard > My Profile > API Tokens > (현재 token edit) > permissions 에 "Workers R2 Storage:Edit" (Account scope) 추가 필수
 - 권한 누락 시 Phase 5 apply 에서 `403 Forbidden` 에러
 
-### 8.7 `cloudflare_dns_record` 의 `name` zone-relative 동작 호환성
+### 8.17 `cloudflare_dns_record` 의 `name` zone-relative 동작 호환성 (→ 8.9에서 실측으로 해결)
 
 - 홈랩 `dns.tf` 는 `name = each.value.subdomain` (값: "argo", "test-web" — zone-relative)
 - v5 공식 문서: "FQDN required". 그러나 `zone_id` 와 함께 쓰면 자동 확장 가능성 있음 (공식 확인 필요)
@@ -1083,19 +1173,19 @@ Migration verified: plan clean, dashboard unchanged, DNS resolving
   - Phase 3 plan 에서 `name` 관련 drift/에러가 나면 → 명시적 FQDN 으로 전환 후 재시도
   - Plan 통과하면 → 그대로 유지
 
-### 8.8 for_each DNS record 의 state key escape
+### 8.18 for_each DNS record 의 state key escape
 
 - bash 에서 `terraform state rm 'cloudflare_dns_record.apps["argocd"]'` 실행 시 따옴표 중첩 주의
 - single quote (`'...'`) 안에 double quote (`"..."`) 넣는 방식 필수
 - zsh 에서도 동일. fish 등 다른 쉘 쓰면 escape 규칙 다름 → bash/zsh 사용 권장
 
-### 8.9 `terraform state push -force` 의 serial 체크
+### 8.19 `terraform state push -force` 의 serial 체크
 
 - 롤백 시 로컬 backup 을 state push 할 때 serial 이 현재보다 낮으면 reject
 - `-force` 플래그로 덮어쓰기 가능하나 R2 versioning 이 더 안전한 1차 경로
 - R2 versioning 복원 → Terraform state push 순서 권장
 
-### 8.10 backend.tf endpoint 변수화
+### 8.20 backend.tf endpoint 변수화 (→ 8.10 실측으로 승격)
 
 - backend `endpoint` 는 `backend.tf` 파일에 하드코딩되어 있지 않음 (line 19 주석: "endpoint는 terraform init -backend-config으로 주입")
 - migration 중 `terraform init -upgrade` 시에도 endpoint config 를 누락하면 backend 연결 실패 → 평소 사용하는 init 스크립트 또는 `.terraformrc` 방식 그대로 유지
@@ -1191,3 +1281,52 @@ terraform state list | head -5
 | `5.18.0` + plan "No changes" | Phase 4 검증 및 커밋 |
 
 이 runbook 의 각 Phase 체크포인트로 돌아가 재개.
+
+---
+
+## 부록 B. 홈랩 실제 수행 결과 (2026-04-19)
+
+### B.1 실제 타임라인 및 커밋 매핑
+
+| Phase | 커밋 | 소요 | 비고 |
+|---|---|---|---|
+| Phase 0: v4 drift 해소 | `69595a2` | 30분 | apps.json에서 argocd/immich 엔트리 정리, security_headers ruleset 정합 |
+| Phase 2: tf-migrate HCL 변환 | `22d93a9` | 40분 | tf-migrate v1.0.0-beta.11 pristine clone 실행 후 diff 복구 + 주석 재입력 |
+| Phase 2 follow-up: moved block 제거 | `f322ef4` | 5분 | `plan` 에서 type mismatch 확인 → moved block 전수 삭제 |
+| Phase 3: v5.19 승격 | `b45b50e` | 60분 | v5.18에서 ruleset state 읽기 실패 → v5.19.0-beta.5로 pin 변경, DNS 수동 state rm + import |
+| Phase 4: apply + 검증 | (본체 commit에 포함) | 20분 | `destroy 0, change 1` (sensitive marking cosmetic) |
+| **합계** | - | **~2.5시간** | 계획 4.5 ~ 6시간 대비 단축 (리소스 5개만 영향) |
+
+### B.2 실제 안정 경로 (홈랩 검증 완료)
+
+```
+1. v4 drift 0 확인 (모든 pending apply 먼저 수행)
+2. tf-migrate v1.0.0-beta.11 pristine clone에서 실행 → HCL 변환
+3. 생성된 moved block 수동 제거    ⚠️ [Gotcha 8.1]
+4. provider version = "5.19.0-beta.5" 정확 pin    ⚠️ [Gotcha 8.3/8.4]
+   (v5.18 스킵 — ruleset state upgrader 없음)
+5. terraform init -upgrade
+6. terraform plan:
+   - ruleset: auto upgrade → No changes
+   - DNS: "no schema available" 에러 → 수동 state 변환 필요
+7. DNS 수동 state rm + import:    ⚠️ [Gotcha 8.2]
+     terraform state rm 'cloudflare_record.apps["<key>"]'
+     terraform import 'cloudflare_dns_record.apps["<key>"]' "${ZONE_ID}/${RECORD_ID}"
+8. terraform plan → "update in-place" (sensitive marking만 cosmetic)    ⚠️ [Gotcha 8.5]
+9. terraform apply — destroy 0, change 1 이하 확인 후 진행
+```
+
+### B.3 실제 결과 상태
+
+- `.terraform.lock.hcl` version = `5.19.0-beta.5`
+- `terraform state list` = 5 instance (DNS 2 + ruleset 3, 계획 그대로)
+- `terraform plan` = No changes (3회 연속)
+- Cloudflare Dashboard: DNS/Cache/WAF/Ratelimit 모두 계획 그대로 (값 변경 0)
+- 이어서 별건 PR (`77d1207`)로 R2 버킷 + lifecycle 추가, (`d27d4eb`)로 PostgreSQL 백업 CronJob 구축
+
+### B.4 다음 migration에서 개선할 점
+
+1. **첫 시도를 v5.19+ 로 시작** — v5.18을 거쳐 갈 이유 없음 (gotcha 8.4)
+2. **tf-migrate는 pristine clone에서 실행** — 작업 브랜치 주석 보존 (gotcha 8.7)
+3. **Phase 2 완료 직후 plan 실행 필수** — moved block 문제를 조기에 발견 (gotcha 8.1)
+4. **Renovate 예외 룰 선행 작성** — v5 pin 보호 (gotcha 8.13)
