@@ -682,3 +682,149 @@ data:
               summary: "ArgoCD Application {{ $labels.name }} Degraded 상태"
               dashboardUid: "infra-alerts-overview"
               panelId: "1"
+
+      - orgId: 1
+        name: backup-alerts
+        folder: Kubernetes
+        interval: 1m
+        rules:
+          - uid: postgresql-backup-failed
+            title: PostgreSQL 백업 실패
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: max_over_time(kube_job_status_failed{job_name=~"postgresql-backup-.*"}[15m])
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 0s
+            labels:
+              severity: critical
+            annotations:
+              summary: "PostgreSQL 백업 Job {{ $labels.job_name }} 실패 — R2 오프사이트/로컬 SSD 백업 둘 다 누락"
+              dashboardUid: "k8s-namespaces"
+              panelId: "75"
+
+          - uid: postgresql-backup-missing
+            title: PostgreSQL 백업 누락 (25h+)
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: time() - kube_cronjob_status_last_successful_time{cronjob="postgresql-backup"}
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 90000
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 10m
+            labels:
+              severity: critical
+            annotations:
+              summary: "PostgreSQL 백업 CronJob이 25시간 이상 성공하지 못함 — RPO 위반 (1일 스케줄 기준)"
+              dashboardUid: "k8s-namespaces"
+              panelId: "75"
+
+          - uid: postgresql-backup-suspended
+            title: PostgreSQL 백업 Suspend 상태
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: kube_cronjob_spec_suspend{cronjob="postgresql-backup"}
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "PostgreSQL 백업 CronJob이 Suspend 상태 — 의도된 것이 아니면 즉시 해제 필요"
+              dashboardUid: "k8s-namespaces"
+              panelId: "75"

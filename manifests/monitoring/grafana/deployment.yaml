@@ -20,6 +20,8 @@ spec:
         app.kubernetes.io/name: grafana
         app.kubernetes.io/part-of: homelab
         app.kubernetes.io/managed-by: argocd
+      annotations:
+        grafana-alerting-reload: "2026-04-19-backup-alerts-v1"
     spec:
       priorityClassName: core-services
       securityContext:
