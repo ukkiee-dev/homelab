@@ -31,9 +31,14 @@ spec:
             runAsNonRoot: false
             seccompProfile:
               type: RuntimeDefault
+          imagePullSecrets:
+            - name: ghcr-pull-secret
           containers:
             - name: pgdump
-              image: postgres:18-alpine
+              # 사전 빌드 이미지: postgres:18-alpine + rclone 1.69.0
+              # 빌드 워크플로우: .github/workflows/build-postgres-backup.yml
+              # Renovate가 Dockerfile의 ARG 버전을 자동 추적 → PR 생성 시 이 image tag도 같이 갱신
+              image: ghcr.io/ukkiee-dev/postgres-backup:18-alpine-rclone1.69.0
               command:
                 - /bin/sh
                 - -c
@@ -42,22 +47,7 @@ spec:
                   set -e
                   echo "=== postgresql-backup started at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
 
-                  # 1. Tools — postgres:18-alpine에 psql/pg_dump v18 내장,
-                  #    rclone은 공식 binary 다운로드 (apk에 없거나 구버전)
-                  apk add --no-cache curl unzip ca-certificates >/dev/null
-                  RCLONE_VERSION=1.69.0
-                  ARCH=$(uname -m)
-                  case "$ARCH" in
-                    aarch64|arm64) RC_ARCH=arm64 ;;
-                    x86_64|amd64)  RC_ARCH=amd64 ;;
-                    *) echo "unsupported arch: $ARCH"; exit 1 ;;
-                  esac
-                  curl -fsSL "https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${RC_ARCH}.zip" -o /tmp/rclone.zip
-                  unzip -q /tmp/rclone.zip -d /tmp/
-                  install -m 755 "/tmp/rclone-v${RCLONE_VERSION}-linux-${RC_ARCH}/rclone" /usr/local/bin/rclone
-                  rm -rf /tmp/rclone.zip "/tmp/rclone-v${RCLONE_VERSION}-linux-${RC_ARCH}"
-
-                  # 2. DB 리스트 동적 조회 (시스템 DB 제외)
+                  # 1. DB 리스트 동적 조회 (시스템 DB 제외)
                   DBS=$(PGPASSWORD="$PG_PASSWORD" psql -h postgresql -U postgres -tAc \
                     "SELECT datname FROM pg_database WHERE datistemplate=false AND datname!='postgres';")
                   echo "Discovered databases: $DBS"
@@ -66,7 +56,7 @@ spec:
                   TMP=/tmp/dumps
                   mkdir -p "$TMP"
 
-                  # 3. 각 DB를 pg_dump -Fc (custom format, 압축됨)
+                  # 2. 각 DB를 pg_dump -Fc (custom format, 압축됨)
                   for DB in $DBS; do
                     echo "Dumping $DB ..."
                     PGPASSWORD="$PG_PASSWORD" pg_dump -h postgresql -U postgres -Fc -d "$DB" \
@@ -74,12 +64,12 @@ spec:
                     echo "  -> $(wc -c <"$TMP/${DB}-${TS}.dump") bytes"
                   done
 
-                  # 4. 글로벌 오브젝트(role, grant) 별도
+                  # 3. 글로벌 오브젝트(role, grant) 별도
                   PGPASSWORD="$PG_PASSWORD" pg_dumpall -h postgresql -U postgres --globals-only \
                     > "$TMP/globals-${TS}.sql"
                   echo "Globals dumped: $(wc -c <"$TMP/globals-${TS}.sql") bytes"
 
-                  # 5. 외장 SSD 로컬 저장 — R2와 동일 3계층 구조
+                  # 4. 외장 SSD 로컬 저장 — R2와 동일 3계층 구조
                   #    daily 매일, weekly 일요일(%u=7), monthly 매월 1일(%d=01)
                   #    보존 정책도 R2 lifecycle과 동일 (7/28/180일)
                   find "$TMP" -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) \
@@ -100,7 +90,7 @@ spec:
                   find /backups/weekly  -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) -mtime +28  -delete
                   find /backups/monthly -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) -mtime +180 -delete
 
-                  # 6. rclone 설정 (env 주입, 파일 없이도 가능하지만 config 파일이 안정적)
+                  # 5. rclone 설정 (env 주입, 파일 없이도 가능하지만 config 파일이 안정적)
                   mkdir -p /root/.config/rclone
                   cat > /root/.config/rclone/rclone.conf <<EOF
                   [r2]
@@ -114,7 +104,7 @@ spec:
 
                   BUCKET=homelab-postgresql-backup
 
-                  # 7. R2 3계층 업로드 (daily는 항상, weekly는 일요일, monthly는 1일)
+                  # 6. R2 3계층 업로드 (daily는 항상, weekly는 일요일, monthly는 1일)
                   echo "Uploading to r2:$BUCKET/daily/ ..."
                   rclone copy "$TMP/" "r2:$BUCKET/daily/" --s3-no-check-bucket
 
@@ -128,7 +118,7 @@ spec:
                     rclone copy "$TMP/" "r2:$BUCKET/monthly/" --s3-no-check-bucket
                   fi
 
-                  # 8. 정리
+                  # 7. 정리
                   rm -rf "$TMP"
                   echo "=== postgresql-backup complete at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
                   for D in daily weekly monthly; do
