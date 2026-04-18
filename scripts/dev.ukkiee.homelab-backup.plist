@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Homelab PVC 백업 LaunchAgent
+  =============================
+  backup.sh를 매월 1일 04:00 KST에 실행 (AdGuard conf·Uptime Kuma 설정은 변경 빈도 낮음).
+  외장 SSD `/Volumes/ukkiee/homelab/backups`에 tar.gz 스냅샷 기록.
+  7개 보존 = 약 7개월 히스토리.
+
+  수동 실행 경로 (설정 변경 직후 즉시 백업이 필요할 때):
+    make backup                                          # 가장 간편
+    ./backup.sh                                          # 직접 실행
+    launchctl kickstart -k gui/$(id -u)/dev.ukkiee.homelab-backup  # LaunchAgent 경로 검증 목적
+
+  설치:
+    cp scripts/dev.ukkiee.homelab-backup.plist ~/Library/LaunchAgents/
+    # WorkingDirectory 경로가 본인 환경과 일치하는지 확인 후
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.ukkiee.homelab-backup.plist
+    launchctl enable gui/$(id -u)/dev.ukkiee.homelab-backup
+
+  즉시 실행(테스트):
+    launchctl kickstart -k gui/$(id -u)/dev.ukkiee.homelab-backup
+
+  로그 확인:
+    tail -f /tmp/homelab-backup.log /tmp/homelab-backup.err
+
+  제거:
+    launchctl bootout gui/$(id -u)/dev.ukkiee.homelab-backup
+    rm ~/Library/LaunchAgents/dev.ukkiee.homelab-backup.plist
+
+  전제조건:
+    - 터미널/LaunchAgent 호스트 프로세스에 Full Disk Access 부여
+    - `sudo diskutil enableOwnership /Volumes/ukkiee` 1회 실행
+    - kubectl 컨텍스트가 orbstack이고 OrbStack 실행 중
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.ukkiee.homelab-backup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>./backup.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/ukyi/homelab</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>KUBECONFIG</key>
+        <string>/Users/ukyi/.kube/config</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Day</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>4</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/homelab-backup.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/homelab-backup.err</string>
+</dict>
+</plist>

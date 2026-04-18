@@ -66,7 +66,7 @@
 | **SealedSecrets 키페어** | 이것 없이는 기존 SealedSecret YAML 복호화 불가 | 비밀번호 매니저 / 클라우드 스토리지 |
 | **시크릿 원본값** | CF API Token, Tunnel Token, OAuth 키 등 | 비밀번호 매니저 |
 | **Tailscale OAuth** | operator-oauth Secret (client_id, client_secret) | 비밀번호 매니저 |
-| **PVC 백업** | `backup.sh` 출력 (Uptime Kuma, AdGuard, Traefik ACME) | 외부 디스크 / NAS |
+| **PVC 백업** | `backup.sh` 출력 (Uptime Kuma, AdGuard conf) | 외장 SSD `/Volumes/ukkiee/homelab/backups` (LaunchAgent 매월 1일 04:00 KST + `make backup` 수동) |
 | **PostgreSQL pgdump** | PostgreSQL DB (CronJob 매일 03:00 KST 자동 덤프) | apps namespace PVC |
 
 ### 백업 불필요 (Git에서 복구 가능)
@@ -109,12 +109,16 @@ Pod는 자동 재스케줄됨. StatefulSet은 PVC 마운트 대기 후 시작.
 
 ```bash
 # 서비스 스케일 다운
-kubectl scale statefulset/<service> -n apps --replicas=0
+kubectl scale deployment/<service> -n apps --replicas=0
 
-# 백업에서 복원
-tar -xzf backups/<TIMESTAMP>.tar.gz -C /tmp/restore
+# 앱별 최신 백업에서 복원 (namespace/app 구조)
+BACKUP_ROOT=/Volumes/ukkiee/homelab/backups
+LATEST=$(ls -t ${BACKUP_ROOT}/<app>/*.tar.gz | head -1)
+mkdir -p /tmp/restore && tar -xzf "${LATEST}" -C /tmp/restore
+
 # kubectl cp로 데이터 복원 후 스케일 업
-kubectl scale statefulset/<service> -n apps --replicas=1
+kubectl cp /tmp/restore/. apps/<pod>:<container-path>
+kubectl scale deployment/<service> -n apps --replicas=1
 ```
 
 ### D. Mac Mini OS 재설치
@@ -202,7 +206,7 @@ kubectl apply -f sealed-secrets-key-backup.yaml
 
 | 대상 | 방식 | 주기 | 보존 |
 |------|------|------|------|
-| Uptime Kuma, AdGuard, Traefik | `backup.sh` (수동) | 수동 실행 | 최근 7개 |
+| Uptime Kuma, AdGuard conf | `backup.sh` → 외장 SSD (LaunchAgent `dev.ukkiee.homelab-backup`) + 수동 `make backup` | 매월 1일 04:00 KST | 최근 7개 (≈7개월) |
 | PostgreSQL | CronJob `postgresql-backup` | 매일 03:00 KST | 7일 |
 
 ---
