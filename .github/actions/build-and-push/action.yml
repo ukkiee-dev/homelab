@@ -1,0 +1,137 @@
+name: Build & Push Service Image
+description: >-
+  Docker build + GHCR push. 홈랩 규약을 강제한다:
+  - flat 앱           : context=저장소 루트, image=ghcr.io/ukkiee-dev/<app>
+  - 모노레포 서비스   : context=services/<service>, image=ghcr.io/ukkiee-dev/<app>-<service>
+  manifest 갱신은 별도로 앱 레포의 deploy job에서 _update-image.yml을 호출한다.
+
+inputs:
+  app-name:
+    description: "홈랩 앱 이름 (namespace / 프로젝트 디렉토리 이름)"
+    required: true
+  service:
+    description: "모노레포 서비스 이름. 비우면 flat 앱(루트 Dockerfile), 채우면 services/<service>/ 강제."
+    required: false
+    default: ""
+  image-tag:
+    description: "이미지 태그. 비우면 github.sha 사용."
+    required: false
+    default: ""
+  platforms:
+    description: "buildx 플랫폼 목록 (쉼표 구분)."
+    required: false
+    default: "linux/amd64"
+  github-token:
+    description: "GHCR push용 토큰. 일반적으로 secrets.GITHUB_TOKEN 전달."
+    required: true
+
+outputs:
+  image:
+    description: "빌드·푸시된 이미지 전체 ref (image:tag)"
+    value: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+  image-name:
+    description: "이미지 이름 (태그 제외)"
+    value: ${{ steps.meta.outputs.image }}
+  tag:
+    description: "사용된 태그"
+    value: ${{ steps.meta.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate & resolve build context
+      id: meta
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+        SVC: ${{ inputs.service }}
+        IN_TAG: ${{ inputs.image-tag }}
+        SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        # 태그: 입력 우선, 없으면 sha
+        TAG="${IN_TAG:-$SHA}"
+
+        if [ -z "$SVC" ]; then
+          # ── flat 앱 ───────────────────────────────────
+          CTX="."
+          DF="Dockerfile"
+          IMAGE="ghcr.io/ukkiee-dev/$APP"
+          MODE="flat"
+        else
+          # ── 모노레포 서비스 (F안 강제: services/<service>/) ──
+          CTX="services/$SVC"
+          DF="services/$SVC/Dockerfile"
+          IMAGE="ghcr.io/ukkiee-dev/${APP}-${SVC}"
+          MODE="monorepo"
+        fi
+
+        # 강제 규약: 기대 경로가 존재해야 함
+        if [ ! -d "$CTX" ]; then
+          echo "::error title=규약 위반::build context '$CTX' 디렉토리가 없습니다. 모노레포는 services/<service>/ 구조가 강제됩니다."
+          exit 1
+        fi
+        if [ ! -f "$DF" ]; then
+          echo "::error title=Dockerfile 누락::'$DF'가 없습니다. 모노레포는 services/<service>/Dockerfile이 강제됩니다."
+          exit 1
+        fi
+
+        {
+          echo "mode=$MODE"
+          echo "context=$CTX"
+          echo "dockerfile=$DF"
+          echo "image=$IMAGE"
+          echo "tag=$TAG"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "── 빌드 메타 ─────────────────────"
+        echo "  mode       : $MODE"
+        echo "  context    : $CTX"
+        echo "  dockerfile : $DF"
+        echo "  image      : $IMAGE"
+        echo "  tag        : $TAG"
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.github-token }}
+
+    - name: Build & push
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ steps.meta.outputs.context }}
+        file: ${{ steps.meta.outputs.dockerfile }}
+        platforms: ${{ inputs.platforms }}
+        push: true
+        tags: |
+          ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+          ${{ steps.meta.outputs.image }}:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: false
+
+    - name: Summary
+      shell: bash
+      env:
+        IMAGE: ${{ steps.meta.outputs.image }}
+        TAG: ${{ steps.meta.outputs.tag }}
+        MODE: ${{ steps.meta.outputs.mode }}
+        CTX: ${{ steps.meta.outputs.context }}
+      run: |
+        {
+          echo "### 🐳 Build & Push"
+          echo ""
+          echo "- Mode    : \`$MODE\`"
+          echo "- Context : \`$CTX\`"
+          echo "- Image   : \`$IMAGE:$TAG\`"
+          echo "- Also tagged \`:latest\`"
+        } >> "$GITHUB_STEP_SUMMARY"
