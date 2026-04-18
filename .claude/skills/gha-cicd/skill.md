@@ -1,6 +1,7 @@
 ---
 name: gha-cicd
 description: "GitHub Actions CI/CD 오케스트레이터. 워크플로우 작성, 복합 액션 설계, 파이프라인 리뷰(보안/효율/비용), 실패 분석, 테스트 전략 설계를 전문 에이전트에 라우팅한다. 'workflow', '워크플로우', 'GHA', 'GitHub Actions', 'CI/CD', '파이프라인', '복합 액션', 'composite action', 'reusable workflow', '자동화 추가', '빌드 실패', 'CI 에러', '러너 문제', '워크플로우 테스트', '드라이런', 'Actions 리뷰', '파이프라인 보안' 등 GitHub Actions 관련 모든 요청에 반응. 단순 git 명령이나 GitHub API 직접 호출 같은 Actions와 무관한 작업에는 트리거하지 않는다."
+version: "1.0.0"
 ---
 
 # GHA CI/CD — 파이프라인 오케스트레이터

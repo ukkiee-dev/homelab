@@ -1,6 +1,7 @@
 ---
 name: resource-optimizer
 description: "K8s 클러스터 리소스 최적화 오케스트레이터. kubectl top, VictoriaMetrics PromQL로 실사용량을 분석하고, 피크24h x 1.3 기준으로 request/limit를 재조정하며, PriorityClass/ResourceQuota/퇴거 순서를 설계한다. 'OOM', '리소스 부족', 'Pending', '메모리 최적화', 'CPU 최적화', 'request 조정', 'limit 조정', '리소스 right-sizing', '과잉 할당', '오버커밋', '리소스 분석', '우선순위 클래스', '퇴거', 'eviction', 'QoS', '리소스 쿼터', 'ResourceQuota', '새 앱 리소스', '스케줄링 최적화', '리소스 최적화', 'resource optimization' 등 클러스터 리소스 관련 모든 최적화 요청에 반응. 단순 매니페스트 생성(k8s-manifest-generator)이나 보안 감사(infra-security-audit)에는 트리거하지 않는다."
+version: "1.0.0"
 ---
 
 # Resource Optimizer — 클러스터 리소스 최적화 오케스트레이터
@@ -111,26 +112,17 @@ Agent(
 
 ## 데이터 흐름
 
-```
-사용자 요청 → [오케스트레이터: 상황 분석 + 라우팅]
-                    │
-                    ↓
-            [resource-analyst]
-                    │
-                    ↓ 01_resource_analysis.md
-                    │
-         ┌──────────┼──────────┐
-         ↓                     ↓
-[sizing-engineer]    [scheduling-strategist]
-         │                     │
-         ↓                     ↓
-02_sizing_rec.md     03_scheduling.md
-         │                     │
-         └──────────┬──────────┘
-                    ↓
-          [오케스트레이터: 통합]
-                    ↓
-            최종 보고서
+```mermaid
+flowchart TD
+    U[사용자 요청] --> O[오케스트레이터<br/>상황 분석 + 라우팅]
+    O --> RA[resource-analyst]
+    RA -->|01_resource_analysis.md| SE[sizing-engineer]
+    RA -->|01_resource_analysis.md| SS[scheduling-strategist]
+    SE --> F1[02_sizing_recommendations.md]
+    SS --> F2[03_scheduling_strategy.md]
+    F1 --> I[오케스트레이터: 통합]
+    F2 --> I
+    I --> R[최종 보고서]
 ```
 
 ## 에러 핸들링

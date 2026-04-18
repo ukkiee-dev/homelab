@@ -1,6 +1,7 @@
 ---
 name: cluster-diagnose
 description: "K3s 클러스터 진단 체크리스트와 트러블슈팅 절차. 파드 장애, 리소스 부족, 네트워크 문제, 스토리지 이슈, ArgoCD 동기화 실패 등 클러스터 문제 진단 시 사용한다. 'pod 안 뜸', '장애', 'CrashLoop', 'OOM', 'ImagePullBackOff', 'Pending', '동기화 실패', 'OutOfSync', 'PVC 마운트', '노드 리소스', 'kubectl', '로그 분석', '디버깅', '왜 안 돼' 등 클러스터 문제 관련 키워드에 반응."
+version: "1.0.0"
 ---
 
 # 클러스터 진단 가이드

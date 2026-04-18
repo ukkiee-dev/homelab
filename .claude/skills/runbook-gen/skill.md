@@ -1,6 +1,7 @@
 ---
 name: runbook-gen
 description: "운영 Runbook 생성 오케스트레이터. 코드베이스에서 운영 절차를 추출하고, 표준 형식(증상→진단→해결→검증) Runbook을 작성하며, Mermaid 아키텍처 다이어그램을 생성한다. 'Runbook', '런북', '운영 문서', '운영 절차서', '장애 대응 문서', '복구 절차', 'playbook', '운영 매뉴얼', 'SOP', '표준 운영 절차', '운영 지식 문서화', '다이어그램 생성', '아키텍처 시각화', '토폴로지 그려줘' 등 운영 문서화 요청에 반응. 기존 코드를 직접 수정하는 작업이나 라이브 트러블슈팅에는 트리거하지 않는다 — 장애 대응은 cluster-diagnose, 매니페스트 수정은 homelab-ops가 담당."
+version: "1.0.0"
 ---
 
 # Runbook Gen — 운영 Runbook 생성 오케스트레이터
@@ -44,7 +45,7 @@ Agent(
     - docs/disaster-recovery.md (기존 복구 절차)
     - manifests/ (서비스 의존 관계, 네트워크 토폴로지)
     - terraform/ (DNS/인프라 관리)
-    - .claude/skills/cluster-diagnose/skill.md (진단 체크리스트)
+    - .claude/skills/cluster-diagnose/SKILL.md (진단 체크리스트)
     결과를 _workspace/01_analysis.md에 저장하라."
 )
 ```
@@ -62,7 +63,7 @@ Agent(
     기존 운영 문서도 직접 읽어 통합하라:
     - docs/disaster-recovery.md
     - Makefile
-    - .claude/skills/cluster-diagnose/skill.md
+    - .claude/skills/cluster-diagnose/SKILL.md
     카테고리별로 _workspace/02_runbooks/ 디렉토리에 저장하라.
     목차 파일 _workspace/02_runbooks/index.md도 생성하라."
 )
@@ -102,14 +103,22 @@ Agent(
 
 ## 데이터 흐름
 
-```
-코드베이스 → [code-analyst] → 01_analysis.md
-                                    ↓
-기존 문서 ───→ [runbook-writer] → 02_runbooks/*.md
-                                    ↓
-              [arch-diagrammer] → 03_diagrams.md + Runbook 내 다이어그램
-                                    ↓
-              [리더: 통합] → docs/runbooks/
+```mermaid
+flowchart TD
+    CB[코드베이스<br/>Makefile, scripts/, manifests/, .github/] --> CA[code-analyst]
+    CA --> A1[01_analysis.md<br/>운영 절차·의존 관계·실패 모드]
+
+    DOC[기존 운영 문서<br/>docs/disaster-recovery.md 등] --> RW[runbook-writer]
+    A1 --> RW
+    RW --> A2[02_runbooks/*.md<br/>카테고리별 Runbook + index.md]
+
+    A1 --> AD[arch-diagrammer]
+    A2 --> AD
+    AD --> A3[03_diagrams.md]
+    AD -. 다이어그램 삽입 .-> A2
+
+    A2 --> OUT[docs/runbooks/]
+    A3 --> OUT
 ```
 
 ## 에러 핸들링

@@ -1,6 +1,7 @@
 ---
 name: terraform-iac
 description: "Terraform IaC 관리 오케스트레이터. HCL 코드 작성(dns.tf, apps.json), 인프라 드리프트 탐지(terraform plan 분석), 상태 관리(R2 백엔드, import, state mv)를 전문 에이전트에 라우팅한다. 'terraform', 'HCL', 'dns.tf', 'apps.json 수정', 'DNS 레코드', 'terraform plan', '드리프트', 'drift', 'state 관리', 'terraform import', 'state lock', 'R2 백엔드', 'provider 업그레이드', 'Cloudflare DNS', 'terraform 검증', 'IaC' 등 Terraform 관련 모든 요청에 반응. 단순 Cloudflare Workers/Pages 질문이나 K8s 매니페스트만 필요한 요청에는 트리거하지 않는다."
+version: "1.0.0"
 ---
 
 # Terraform IaC Orchestrator

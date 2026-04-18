@@ -1,6 +1,7 @@
 ---
 name: infra-security-audit
-description: "K8s 홈랩 인프라 보안 감사 오케스트레이터. 네트워크(NetworkPolicy, 포트, Traefik), 시크릿(SealedSecret, 평문, 로테이션), 컨테이너(CVE, securityContext, 권한), 접근제어(RBAC, ServiceAccount, Tailscale) 4개 영역을 병렬 감사하고 통합 보안 보고서를 생성한다. '보안 감사', 'security audit', '인프라 보안', '클러스터 보안 점검', '보안 스캔', 'NetworkPolicy 감사', 'RBAC 감사', '시크릿 감사', '컨테이너 보안', '접근제어 점검', '보안 보고서', 'CVE 스캔', '취약점 감사', '보안 현황' 등 인프라 보안 감사 요청에 반응. 코드 보안 리뷰(OWASP, XSS, SQL 인젝션)에는 트리거하지 않는다 — 코드 보안은 security-reviewer 에이전트가 담당."
+description: "K8s 홈랩 인프라 심층 보안 감사 오케스트레이터. 4명의 감사자 팀(network/secret/container/access-auditor)으로 병렬 감사하고 공격 체인·권한 상승 경로 등 교차 도메인 위험을 식별하여 Critical/High/Medium/Low 매트릭스 형태의 통합 보안 보고서를 생성한다. '보안 감사', 'security audit', '인프라 보안 감사', '클러스터 보안 점검', '보안 스캔', 'NetworkPolicy 감사', 'RBAC 감사', '시크릿 감사', '컨테이너 보안 감사', '접근제어 점검', '보안 보고서', 'CVE 스캔', '취약점 감사', '공격 체인', '보안 매트릭스', '심층 감사' 등 깊이 있는 감사 요청에 반응. 단일 파일/매니페스트의 빠른 일반 보안 리뷰는 homelab-ops 스킬이, 코드 보안 리뷰(OWASP, XSS, SQL 인젝션)는 security-reviewer 에이전트가 담당한다."
+version: "1.0.0"
 ---
 
 # Infra Security Audit — 인프라 보안 감사 오케스트레이터
@@ -142,19 +143,29 @@ TaskCreate(tasks: [
 
 ## 데이터 흐름
 
-```
-[리더] → TeamCreate → [network] ←SendMessage→ [container]
-                       [secret]  ←SendMessage→ [access]
-                          │                        │
-                          ↓                        ↓
-                   audit_network.md          audit_access.md
-                   audit_secrets.md          audit_containers.md
-                          │                        │
-                          └──────── Read ──────────┘
-                                    ↓
-                            [리더: 통합 보고서]
-                                    ↓
-                        통합 보안 감사 보고서
+```mermaid
+flowchart TB
+    L[리더<br/>오케스트레이터] -->|TeamCreate| T((감사 팀))
+    T --> N[network-auditor]
+    T --> S[secret-auditor]
+    T --> C[container-auditor]
+    T --> A[access-auditor]
+
+    N <-. SendMessage .-> C
+    N <-. SendMessage .-> A
+    S <-. SendMessage .-> A
+    C <-. SendMessage .-> S
+
+    N --> F1[audit_network.md]
+    S --> F2[audit_secrets.md]
+    C --> F3[audit_containers.md]
+    A --> F4[audit_access.md]
+
+    F1 -->|Read| I[리더: 통합 분석<br/>교차 도메인 위험 식별]
+    F2 -->|Read| I
+    F3 -->|Read| I
+    F4 -->|Read| I
+    I --> R[통합 보안 감사 보고서<br/>Critical/High/Medium/Low 매트릭스]
 ```
 
 ## 에러 핸들링
