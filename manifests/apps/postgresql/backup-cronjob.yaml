@@ -79,11 +79,26 @@ spec:
                     > "$TMP/globals-${TS}.sql"
                   echo "Globals dumped: $(wc -c <"$TMP/globals-${TS}.sql") bytes"
 
-                  # 5. 외장 SSD 로컬 저장 (3일 보존) — find로 POSIX 안전하게
-                  #    (DB 없는 초기 상태에서 *.dump 미존재 시 globbing 실패 방지)
+                  # 5. 외장 SSD 로컬 저장 — R2와 동일 3계층 구조
+                  #    daily 매일, weekly 일요일(%u=7), monthly 매월 1일(%d=01)
+                  #    보존 정책도 R2 lifecycle과 동일 (7/28/180일)
                   find "$TMP" -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) \
-                    -exec cp {} /backups/ \;
-                  find /backups -type f \( -name "*.dump" -o -name "*.sql" \) -mtime +3 -delete
+                    -exec cp {} /backups/daily/ \;
+
+                  if [ "$(date -u +%u)" = "7" ]; then
+                    find "$TMP" -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) \
+                      -exec cp {} /backups/weekly/ \;
+                  fi
+
+                  if [ "$(date -u +%d)" = "01" ]; then
+                    find "$TMP" -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) \
+                      -exec cp {} /backups/monthly/ \;
+                  fi
+
+                  # 계층별 보존 정리 (R2 lifecycle과 정합)
+                  find /backups/daily   -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) -mtime +7   -delete
+                  find /backups/weekly  -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) -mtime +28  -delete
+                  find /backups/monthly -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) -mtime +180 -delete
 
                   # 6. rclone 설정 (env 주입, 파일 없이도 가능하지만 config 파일이 안정적)
                   mkdir -p /root/.config/rclone
@@ -116,7 +131,10 @@ spec:
                   # 8. 정리
                   rm -rf "$TMP"
                   echo "=== postgresql-backup complete at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
-                  ls -lh /backups/
+                  for D in daily weekly monthly; do
+                    echo "--- /backups/$D/ ---"
+                    ls -lh "/backups/$D/" 2>/dev/null || true
+                  done
               resources:
                 requests:
                   cpu: 25m
