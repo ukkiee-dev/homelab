@@ -32,7 +32,38 @@ data:
 
     loki.source.kubernetes "pods" {
       targets    = discovery.relabel.pods.output
+      forward_to = [loki.process.parse_level.receiver]
+    }
+
+    // Extract log level from common formats and promote to label.
+    // Supports JSON (`{"level":"info"}`) and logfmt (`level=info`).
+    loki.process "parse_level" {
       forward_to = [loki.write.victorialogs.receiver]
+
+      // JSON structured logs -> level field
+      stage.json {
+        expressions = {
+          level_json = "level",
+        }
+      }
+
+      // logfmt style -> level=info
+      stage.regex {
+        expression = "level=(?P<level_logfmt>(?i)debug|info|warn|warning|error|fatal|trace)"
+      }
+
+      // Coalesce into single extracted value, normalize to lowercase.
+      stage.template {
+        source   = "level"
+        template = "{{ or .level_json .level_logfmt | lower }}"
+      }
+
+      // Promote extracted value to a VL label.
+      stage.labels {
+        values = {
+          level = "",
+        }
+      }
     }
 
     loki.write "victorialogs" {
