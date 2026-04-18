@@ -10,4 +10,5 @@ generatorOptions:
 configMapGenerator:
   - name: grafana-dashboards-apps
     files:
+      - cloudflared.json
       - postgresql.json

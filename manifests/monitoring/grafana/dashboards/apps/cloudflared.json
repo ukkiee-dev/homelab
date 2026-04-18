@@ -1,0 +1,474 @@
+{
+  "uid": "app-cloudflared",
+  "title": "Cloudflared Tunnel",
+  "tags": ["cloudflared", "tunnel", "networking", "apps"],
+  "timezone": "Asia/Seoul",
+  "schemaVersion": 39,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "pod",
+        "label": "Pod",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
+        "query": {
+          "query": "label_values(cloudflared_tunnel_ha_connections, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "label_values(cloudflared_tunnel_ha_connections, pod)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "HA Connections (current)",
+      "description": "Number of active HA connections to Cloudflare edge. Healthy >= 2 (redundant). 0 means tunnel down.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cloudflared_tunnel_ha_connections{pod=~\"$pod\"})",
+          "legendFormat": "ha connections",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "green", "value": 2}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Concurrent Requests",
+      "description": "cloudflared_tunnel_concurrent_requests_per_tunnel: in-flight requests through the tunnel.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 8, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cloudflared_tunnel_concurrent_requests_per_tunnel{pod=~\"$pod\"})",
+          "legendFormat": "in-flight",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Pod Restarts (1h)",
+      "description": "Increase of kube_pod_container_status_restarts_total over the last hour for all cloudflared pods in networking namespace. > 0 signals recent instability.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"networking\", pod=~\"cloudflared.*\"}[1h]))",
+          "legendFormat": "restarts (1h)",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 3}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "HA Connections by Pod",
+      "description": "Per-pod HA connection count over time. Drops indicate tunnel re-establishment.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "cloudflared_tunnel_ha_connections{pod=~\"$pod\"}",
+          "legendFormat": "{{pod}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull", "min"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "green", "value": 2}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Request & Error Rate (req/s)",
+      "description": "rate(cloudflared_tunnel_total_requests[5m]) overlaid with rate(cloudflared_tunnel_request_errors[5m]). Error rate should stay near 0.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(cloudflared_tunnel_total_requests{pod=~\"$pod\"}[5m])) by (pod)",
+          "legendFormat": "requests {{pod}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(cloudflared_tunnel_request_errors{pod=~\"$pod\"}[5m])) by (pod)",
+          "legendFormat": "errors {{pod}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": ["mean", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byRegexp", "options": "^errors.*"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Proxy Connect Latency (p50 / p95 / p99)",
+      "description": "histogram_quantile over cloudflared_proxy_connect_latency_bucket (seconds). Indicates latency to origin through the tunnel proxy.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(cloudflared_proxy_connect_latency_bucket{pod=~\"$pod\"}[5m])) by (le))",
+          "legendFormat": "p50",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(cloudflared_proxy_connect_latency_bucket{pod=~\"$pod\"}[5m])) by (le))",
+          "legendFormat": "p95",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum(rate(cloudflared_proxy_connect_latency_bucket{pod=~\"$pod\"}[5m])) by (le))",
+          "legendFormat": "p99",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": ["mean", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Pod CPU Usage",
+      "description": "rate(container_cpu_usage_seconds_total) for cloudflared pods in networking namespace (cores).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"networking\", pod=~\"cloudflared.*\", container!=\"\", container!=\"POD\"}[5m])) by (pod)",
+          "legendFormat": "{{pod}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": ["mean", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "axisLabel": "cores"
+          },
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Pod Memory Usage",
+      "description": "container_memory_working_set_bytes for cloudflared pods in networking namespace.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(container_memory_working_set_bytes{namespace=\"networking\", pod=~\"cloudflared.*\", container!=\"\", container!=\"POD\"}) by (pod)",
+          "legendFormat": "{{pod}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 2,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Cloudflare Edge Locations",
+      "description": "cloudflared_tunnel_server_locations: which Cloudflare edge each HA connection is attached to (connection_id, edge_location).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 28},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "cloudflared_tunnel_server_locations{pod=~\"$pod\"}",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Time"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Value"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "__name__"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "job"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "instance"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "namespace"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "app_kubernetes_io_component"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "app_kubernetes_io_name"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "app_kubernetes_io_part_of"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "pod_template_hash"},
+            "properties": [{"id": "custom.hidden", "value": true}]
+          }
+        ]
+      }
+    }
+  ]
+}
