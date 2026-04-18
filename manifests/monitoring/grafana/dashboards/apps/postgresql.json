@@ -1,0 +1,417 @@
+{
+  "uid": "app-postgresql",
+  "title": "PostgreSQL",
+  "tags": ["postgresql", "database", "apps"],
+  "timezone": "Asia/Seoul",
+  "schemaVersion": 39,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datname",
+        "label": "Database",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
+        "query": {
+          "query": "label_values(pg_database_size_bytes, datname)",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "label_values(pg_database_size_bytes, datname)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": ["api"],
+          "value": ["api"]
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "DB Up/Down",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pg_up{namespace=\"apps\"}",
+          "legendFormat": "pg_up",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {"text": "DOWN", "color": "red", "index": 0},
+                "1": {"text": "UP", "color": "green", "index": 1}
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "green", "value": 1}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Active Connections",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(pg_stat_database_numbackends{namespace=\"apps\"})",
+          "legendFormat": "connections",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "gauge",
+      "title": "Connection Usage %",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(pg_stat_database_numbackends{namespace=\"apps\"}) / max(pg_settings_max_connections{namespace=\"apps\"}) * 100",
+          "legendFormat": "used %",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 85}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Commit vs Rollback (ops/s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pg_stat_database_xact_commit{namespace=\"apps\", datname=~\"$datname\"}[5m]))",
+          "legendFormat": "commits",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(pg_stat_database_xact_rollback{namespace=\"apps\", datname=~\"$datname\"}[5m]))",
+          "legendFormat": "rollbacks",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": []},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "rollbacks"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "commits"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Longest Transaction",
+      "description": "pg_stat_activity_max_tx_duration from postgres_exporter (seconds). Values <= 0 mean no transaction in progress.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(pg_stat_activity_max_tx_duration{namespace=\"apps\"})",
+          "legendFormat": "max tx duration",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 10}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Database Size",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pg_database_size_bytes{namespace=\"apps\", datname=~\"$datname\"}",
+          "legendFormat": "{{datname}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": {"mode": "none"}
+          },
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "WAL Size (current)",
+      "description": "pg_wal_size_bytes: current size of pg_wal directory. Rate would indicate WAL generation pressure; here we plot the raw value to observe checkpoint cycles and retention behaviour.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pg_wal_size_bytes{namespace=\"apps\"}",
+          "legendFormat": "pg_wal size",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        },
+        {
+          "refId": "B",
+          "expr": "pg_wal_segments{namespace=\"apps\"}",
+          "legendFormat": "WAL segments",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "WAL segments"},
+            "properties": [
+              {"id": "unit", "value": "none"},
+              {"id": "custom.axisPlacement", "value": "right"}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Buffer Cache Hit Ratio",
+      "description": "Ratio of blocks served from shared buffers vs read from disk. Target >= 99% for healthy OLTP.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 20},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pg_stat_database_blks_hit{namespace=\"apps\"}[5m])) / (sum(rate(pg_stat_database_blks_hit{namespace=\"apps\"}[5m])) + sum(rate(pg_stat_database_blks_read{namespace=\"apps\"}[5m])))",
+          "legendFormat": "hit ratio",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 4,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.9},
+              {"color": "green", "value": 0.99}
+            ]
+          },
+          "color": {"mode": "thresholds"}
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
