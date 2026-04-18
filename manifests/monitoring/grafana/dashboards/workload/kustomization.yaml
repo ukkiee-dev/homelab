@@ -11,5 +11,6 @@ configMapGenerator:
   - name: grafana-dashboards-workload
     files:
       - kube-state-metrics-v2.json
+      - logs-explorer.json
       - victorialogs.json
       - victoriametrics.json

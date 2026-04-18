@@ -19,5 +19,6 @@ data:
         access: proxy
       - name: VictoriaLogs
         type: victoriametrics-logs-datasource
+        uid: victorialogs
         url: http://victoria-logs.monitoring:9428
         access: proxy
