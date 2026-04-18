@@ -81,14 +81,24 @@ GitHub Actions
 │   ├── provider.tf              # Cloudflare provider
 │   └── variables.tf             # Input variables
 ├── .github/
-│   ├── workflows/
-│   │   ├── _update-image.yml    # 이미지 태그 갱신 (reusable)
-│   │   ├── teardown.yml         # 앱 제거 자동화
-│   │   └── audit-orphans.yml    # 주간 고아 앱 + Tunnel drift 감사
+│   ├── workflows/                  # reusable + dispatch
+│   │   ├── _create-app.yml         #   앱 생성 (flat / monorepo 서비스)
+│   │   ├── _update-image.yml       #   이미지 태그 갱신 (service 옵셔널)
+│   │   ├── _sync-app-config.yml    #   .app-config.yml → 매니페스트 동기화
+│   │   ├── _teardown.yml           #   앱 제거 (3-way: flat / service / project)
+│   │   ├── teardown.yml            #   teardown dispatch
+│   │   ├── update-app-config.yml   #   수동 설정 갱신 dispatch
+│   │   ├── tunnel-cleanup.yml      #   Tunnel 드리프트 정리
+│   │   ├── audit-orphans.yml       #   주간 고아 앱 + Tunnel drift 감사
+│   │   └── build-postgres-backup.yml # postgres-backup 이미지 빌드
 │   ├── actions/
-│   │   └── setup-app/           # 앱 온보딩 composite action
-│   └── scripts/
-│       └── manage-tunnel-ingress.sh  # Tunnel API 관리 스크립트
+│   │   ├── setup-app/              # 앱 스캐폴딩 composite (매니페스트/DNS/Tunnel)
+│   │   ├── build-and-push/         # 앱 이미지 빌드+GHCR push composite (F안 규약 강제)
+│   │   └── git-push-retry/         # push 경합 재시도
+│   ├── scripts/
+│   │   └── manage-tunnel-ingress.sh  # Tunnel API 관리 스크립트
+│   └── templates/
+│       └── ghcr-pull-secret.sealed.yaml  # cluster-wide sealed pull secret
 ├── docs/
 │   └── disaster-recovery.md     # DR playbook (5 scenarios)
 ├── scripts/
@@ -159,18 +169,37 @@ GitHub Actions
 앱의 생성부터 제거까지 자동화되어 있다.
 
 **온보딩** (`setup-app` composite action):
-1. `apps.json`에 앱 등록
+1. `apps.json`에 앱 등록 (flat은 `<app>`, 모노레포 서비스는 `<app>-<service>` 키)
 2. Terraform으로 Cloudflare DNS CNAME 생성
 3. Tunnel API로 ingress rule 추가
 4. K8s 매니페스트 + ArgoCD Application YAML 자동 생성
 5. Git push → ArgoCD 자동 sync
 
-**제거** (`teardown.yml` workflow):
-1. `apps.json`에서 앱 삭제 + Terraform destroy
-2. Tunnel ingress 제거 (Cloudflare API)
-3. GHCR 패키지 삭제
-4. 매니페스트 + ArgoCD Application 삭제
-5. ArgoCD Application kubectl delete (finalizer cascade)
+**앱 유형 2가지** (동일 `_create-app.yml` 에 `service-name` 유무로 분기):
+
+- **Flat 앱** (service-name 비움)
+  - `manifests/apps/<app>/{deployment,service,ingressroute,...}.yaml`
+  - 이미지: `ghcr.io/ukkiee-dev/<app>:<tag>`
+  - 예: `test-web`
+- **모노레포 프로젝트** (service-name 채움, F안 규약 강제)
+  - `manifests/apps/<app>/common/` + `manifests/apps/<app>/services/<service>/`
+  - 한 프로젝트 = 한 namespace = 하나의 ArgoCD Application
+  - 이미지: `ghcr.io/ukkiee-dev/<app>-<service>:<tag>`
+  - 두 번째 서비스는 `_create-app.yml`을 `service-name=scraper`로 다시 실행
+  - 예: `pokopia-wiki` (api, scraper)
+
+**앱 이미지 빌드** (`build-and-push` composite action):
+- 앱 레포의 `build.yml` caller가 matrix로 `service`별 호출
+- composite action이 이미지 이름 규약(`<app>-<service>`)과 `services/<service>/Dockerfile` 경로를 강제
+- GHCR push 후 `_update-image.yml`로 homelab 매니페스트 자동 갱신 → ArgoCD rolling update
+- 시작 템플릿: `ukkiee-dev/app-starter`
+
+**제거** (`teardown.yml` workflow — 3-way 분기):
+1. **flat**: `<app>` apps.json 키 + 매니페스트 + ArgoCD App + GHCR `<app>` + DNS/Tunnel 전부 제거
+2. **service** (`service=<svc>` 입력): `<app>/services/<svc>` 만 제거. 루트 kustomization에서 엔트리 yq 제거. GHCR `<app>-<svc>` 삭제. ArgoCD Application·프로젝트 shell **유지**
+3. **project** (모노레포 전체): services/ 디렉토리 스캔 → 각 `<app>-<svc>` 키/패키지/tunnel 전수 제거 + 프로젝트 전체 삭제
+
+모든 모드 공통 후처리: ArgoCD REST API로 Application 삭제(project/flat), finalizer cascade로 Pod/Service까지 정리.
 
 **감사** (`audit-orphans.yml` — 매주 월요일 09:00 KST):
 - 고아 앱 탐지 (apps.json에는 있지만 GitHub 레포 없는 앱)
