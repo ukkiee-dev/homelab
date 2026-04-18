@@ -100,6 +100,9 @@ spec:
             - name: dashboard-provider
               mountPath: /etc/grafana/provisioning/dashboards
               readOnly: true
+            - name: dashboards-apps
+              mountPath: /var/lib/grafana/dashboards/apps
+              readOnly: true
             - name: dashboards-kubernetes
               mountPath: /var/lib/grafana/dashboards/kubernetes
               readOnly: true
@@ -122,6 +125,9 @@ spec:
         - name: dashboard-provider
           configMap:
             name: grafana-dashboard-provider
+        - name: dashboards-apps
+          configMap:
+            name: grafana-dashboards-apps
         - name: dashboards-kubernetes
           configMap:
             name: grafana-dashboards-kubernetes
