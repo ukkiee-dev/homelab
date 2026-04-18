@@ -1,6 +1,7 @@
 # Grafana 개선 후속 작업 TODO
 
 > 2026-04-18 Grafana 대시보드 개선 세션 마무리 시점 기록.
+> **2026-04-18 후속 세션**: P1 3건 + P2 2건 모두 해결. P3(선택적 대시보드)과 Phase 6 품질 정리만 잔여.
 > 원본 계획: [`2026-04-18-grafana-dashboard-improvement.md`](./2026-04-18-grafana-dashboard-improvement.md)
 > 감사 보고서: [`_workspace/grafana_dashboard_audit.md`](../../_workspace/grafana_dashboard_audit.md)
 
@@ -8,7 +9,7 @@
 
 ## 완료 요약
 
-9개 Task 배포 완료. 대시보드 총 14개 (기존 9 + 신규 5).
+9개 Task + 후속 5건 배포 완료. 대시보드 총 14개 (기존 9 + 신규 5).
 
 | 구분 | 배포된 변경 |
 |------|------------|
@@ -18,57 +19,93 @@
 | 앱 대시보드 | PostgreSQL, Cloudflared Tunnel |
 | 인프라 | Traefik metrics + 대시보드, CoreDNS 대시보드 |
 | 알람 UX | Alert Overview 대시보드, 10개 rule에 dashboardUid/panelId deep-link |
+| **후속: 로그 파싱** | Alloy `loki.process` JSON/logfmt level 추출 스테이지 |
+| **후속: Auto-reload** | Kustomize `configMapGenerator` hash suffix 활성화 (근본 해결) |
+| **후속: Runbook** | `docs/runbooks/` 신규 + PostgreSQL helm upgrade 절차 |
+| **후속: AppProject** | `infra` project에 `IngressClass` 리소스 허용 |
+| **후속: Chart drift** | Traefik `targetRevision` 34.5.0 → 39.0.6 (helm 실 release와 정합) |
 
 ---
 
-## P1 후속 이슈 (운영 품질)
+## P1 후속 이슈 (운영 품질) — ✅ 전부 해결 (2026-04-18)
 
-### [ ] Alloy 로그 파싱 스테이지 추가
+### [x] Alloy 로그 파싱 스테이지 추가 ✅ 2026-04-18 해결
 
-- **문제**: `logs-explorer.json` 패널 3(레벨별 로그 건수)이 빈 결과. Alloy가 raw stdout/stderr만 VictoriaLogs로 푸시, `level` 라벨 파싱 안 함.
-- **해결**: `manifests/monitoring/alloy/config.yaml`에 `stage.logfmt` 또는 `stage.json` 파이프라인 추가.
-  - 앱별 로그 포맷이 달라 multi-stage 또는 per-namespace 라우팅 필요할 수 있음.
-  - JSON 로그 앱(예: cloudflared access log)은 `stage.json`, logfmt 앱은 `stage.logfmt`, plain text는 `stage.regex`.
-- **검증**: logs-explorer 패널 3에서 `error`/`warn`/`info` 시리즈가 나뉘어 표시.
-- **규모**: ~1시간.
+**해결**: `manifests/monitoring/alloy/config.yaml`에 `loki.process "parse_level"` 블록 추가.
+- `stage.json` → JSON 구조화 로그의 `level` 필드 추출 (`level_json`)
+- `stage.regex` → logfmt 형식의 `level=info` 추출 (`level_logfmt`)
+- `stage.template`으로 `{{ or .level_json .level_logfmt | lower }}` coalesce
+- `stage.labels`로 VictoriaLogs label 승격
 
-### [ ] Grafana provisioning auto-reload 미작동 회피
+**주의**: Alloy Flow 문법은 Loki의 stages를 `loki.process { stage.* {} }` 블록으로 감싸는 형태. 원 문서에 기재된 "`stage.logfmt` 파이프라인 추가"는 Grafana Agent(Loki promtail) 문법이라 Alloy에 바로 적용되지 않음 — 교정됨.
 
-- **문제**: `dashboard-provider.yaml`의 `updateIntervalSeconds: 30` 설정에도 Grafana가 ConfigMap 파일 변경을 감지하지 못함. 새 대시보드 추가 시 `/api/admin/provisioning/dashboards/reload` 수동 호출 필요.
-- **증거**: Task 1.1·3.4·4.3·5.1 모두 manual reload로 해결.
-- **해결 옵션**:
-  1. kustomize-sidecar 패턴 (kiwigrid/k8s-sidecar) 도입 → ConfigMap 변경 watch + 자동 reload.
-  2. Deployment에 annotation checksum 추가해 ConfigMap 변경 시 pod restart.
-  3. 현재 수동 reload 패턴 유지 (단순성).
-- **규모**: sidecar 도입 시 ~2시간, annotation checksum은 ~30분.
+**검증 필요**: ArgoCD sync 후 `logs-explorer.json` 패널 3(레벨별 로그 건수)에서 `error`/`warn`/`info` 시리즈 분리 표시 여부.
 
-### [ ] PostgreSQL helm upgrade password 가드 Runbook 문서화
+### [x] Grafana provisioning auto-reload 근본 해결 ✅ 2026-04-18 해결
 
-- **문제**: Bitnami postgresql chart는 `auth.existingSecret` 설정에도 불구하고 helm upgrade 시 `global.postgresql.auth.password`를 `--set`으로 전달해야 함. 미전달 시 upgrade 실패.
-- **현재**: Task 2.1 실행 시 subagent가 수동으로 secret에서 base64 decode → `--set` 전달.
-- **해결**: `docs/runbooks/postgresql-helm-upgrade.md` 작성 — 전달 명령, 검증, rollback 포함.
-- **규모**: ~30분.
+**근본 원인 재분석**: `dashboard-provider.yaml`의 `updateIntervalSeconds: 30`은 문제가 아니었음. 진짜 원인은 **dashboards 각 카테고리의 `kustomization.yaml`에 `disableNameSuffixHash: true`가 설정되어 있었던 것**. 이 때문에 ConfigMap 내용이 바뀌어도 이름이 동일해 Kubernetes가 Pod volume을 갱신하지 않음.
+
+**해결**: 5개 `dashboards/*/kustomization.yaml` 전부에서 `disableNameSuffixHash: true` 제거.
+- `manifests/monitoring/grafana/dashboards/apps/kustomization.yaml`
+- `manifests/monitoring/grafana/dashboards/infra/kustomization.yaml`
+- `manifests/monitoring/grafana/dashboards/kubernetes/kustomization.yaml`
+- `manifests/monitoring/grafana/dashboards/node/kustomization.yaml`
+- `manifests/monitoring/grafana/dashboards/workload/kustomization.yaml`
+
+**작동 원리**: 제거 후 Kustomize가 ConfigMap 이름 뒤에 content hash suffix(`-abc123def`)를 붙이고, `nameReference` transformer가 Deployment volumes의 참조도 자동으로 hashed name으로 업데이트. 파일 변경 → 새 ConfigMap 생성 → Deployment Pod rollout → 새 provisioning config 로드. 완전 자동화.
+
+**검증**: `kubectl kustomize manifests/monitoring/grafana/` 출력에서 5개 dashboards ConfigMap이 hash suffix 포함한 이름으로 Deployment volumes에 연결됨 확인 완료.
+
+**이점 vs. 원 대안**:
+- 원 옵션 1 (sidecar): 추가 컴포넌트·복잡도 → 불필요해짐.
+- 원 옵션 2 (annotation checksum): 수동 관리 필요 → 불필요해짐.
+- 채택 방식은 **Kustomize 네이티브 패턴**이라 의존성 0, 유지비 0.
+
+### [x] PostgreSQL helm upgrade password 가드 Runbook 문서화 ✅ 2026-04-18 해결
+
+**해결**: `docs/runbooks/postgresql-helm-upgrade.md` 신규 작성 (`docs/runbooks/` 디렉토리 자체 신규 생성).
+
+**Runbook 구성**:
+- 증상 / 트리거 매트릭스 (Renovate PR / 수동 upgrade / values 변경)
+- 진단 체크리스트 (Secret / helm history / ArgoCD status)
+- 해결 옵션 A (ArgoCD 경유 parameters 주입 — 권장)
+- 해결 옵션 B (수동 helm upgrade, selfHeal off 전제)
+- 검증 단계 (Pod Ready / DB 접속 / Secret 보존 / ArgoCD Healthy)
+- Rollback 절차 (`helm rollback` + git revert)
+- 배경 / 근본 원인 설명 (chart rendering 단계의 template 실패 메커니즘)
+
+**파급 효과**: 이 패턴(`auth.existingSecret` + helm rendering 단계 비번 주입)은 MySQL, MongoDB 등 다른 Bitnami chart에도 공통. 향후 해당 chart Runbook도 같은 구조로 작성 가능.
 
 ---
 
-## P2 후속 이슈 (기술 부채)
+## P2 후속 이슈 (기술 부채) — ✅ 전부 해결 (2026-04-18)
 
-### [ ] Traefik chart version drift 정리
+### [x] Traefik chart version drift 정리 ✅ 2026-04-18 해결
 
-- **문제**: ArgoCD `traefik` app source는 `targetRevision: 34.5.0`인데 실제 helm release 기록은 `39.0.6`. 이전 수동 helm upgrade 시도(failed) 흔적.
-- **영향**: 현재 pod은 v3.3 image, 설정은 ArgoCD 관리 하. 실기능엔 지장 없으나 혼란 소지.
-- **해결**:
-  1. ArgoCD source `targetRevision`을 최신 stable(39.x 또는 최신)로 갱신.
-  2. 또는 실제 release 기록을 34.5.0 기준으로 재정렬 (`helm uninstall` + ArgoCD sync로 재설치).
-- **규모**: ~2시간 (upgrade-planner 스킬 활용 권장).
+**해결**: `argocd/applications/infra/traefik.yaml`의 `targetRevision`을 `"34.5.0"` → `"39.0.6"`으로 갱신. 실제 helm release 버전과 일치시켜 drift 제거.
 
-### [ ] ArgoCD AppProject `infra`에 IngressClass 허용 (근본 해결)
+**선택 근거**:
+- 실제 Pod이 이미 chart 39.0.6 기반으로 정상 기동 중 → values.yaml이 39.x schema와 호환됨이 실증됨.
+- values.yaml 점검 결과: `additionalArguments`로 CLI args를 직접 넣고 있어 chart-specific schema 의존이 최소. 34→39 major bump에도 breaking 없음.
+- `kubernetesIngress.enabled: false` 상태라 IngressClass 리소스 자동 생성 경로도 사용 안 함 → 현 시점 회피책(`ingressClass.enabled: false`) 유지 가능.
 
-- **문제**: Task 4.1에서 Traefik Helm이 기본적으로 IngressClass 리소스를 생성하는데 `infra` project의 `clusterResourceWhitelist`가 이를 허용하지 않아 sync 실패.
-- **Workaround**: Task 4.1.2에서 `ingressClass.enabled: false`로 회피.
-- **근본 해결**: `manifests/infra/argocd/appproject-infra.yaml`(또는 해당 파일)의 `clusterResourceWhitelist`에 `{group: networking.k8s.io, kind: IngressClass}` 추가.
-- **이유**: 미래 다른 IngressController 도입 시 재발 방지.
-- **규모**: ~10분.
+**검증 필요**: ArgoCD가 sync 후 Synced/Healthy 유지. drift 재발 여부는 다음 `helm history traefik -n traefik-system`로 확인.
+
+**후속 아이디어 (별건)**: P2 AppProject IngressClass 허용이 이제 완료됐으니, 나중에 `ingressClass.enabled: true`로 전환해 표준화 가능 (긴급성 낮음).
+
+### [x] ArgoCD AppProject `infra`에 IngressClass 허용 ✅ 2026-04-18 해결
+
+**해결**: `manifests/infra/argocd/appproject-infra.yaml`의 `clusterResourceWhitelist`에 다음 항목 추가:
+
+```yaml
+- group: networking.k8s.io
+  kind: IngressClass
+```
+
+**이점**:
+- Traefik Helm이 `ingressClass.enabled: true`로 되돌아가도 sync 실패 없음.
+- 미래 추가 IngressController(예: nginx, contour) 도입 시 AppProject 수정 불필요.
+- 기존 회피책(`ingressClass.enabled: false`)은 유지하되, 언제든 복구 가능.
 
 ---
 
@@ -125,14 +162,20 @@
 
 ## 실행 지침 (다음 세션 시작 시)
 
-```bash
-# 후속 이슈별로 feat branch 분리
-git worktree add -b feat/<scope> /Users/ukyi/homelab-<scope> main
+**잔여 작업**: P3 선택적 대시보드 4건 + Phase 6 품질 정리 2건만 남음. 모두 ROI 관점에서 재검토 후 착수 여부 결정 권장.
 
-# 예시
-git worktree add -b feat/alloy-log-parsing /Users/ukyi/homelab-alloy main
-git worktree add -b feat/traefik-chart-sync /Users/ukyi/homelab-traefik main
+```bash
+# 남은 작업은 가치 낮음 — 필요 시 단일 branch로 진행 가능
+git checkout -b chore/grafana-phase6 main
 ```
+
+### 2026-04-18 후속 세션 검증 체크리스트 (ArgoCD sync 후)
+
+1. **Alloy loki.process**: Alloy Pod 정상 재기동 → `logs-explorer.json` 패널 3에서 level별 분리 확인.
+2. **Grafana auto-reload**: dashboard JSON 더미 수정 → commit → push → ArgoCD sync → Pod 자동 rollout 확인 (ConfigMap hash suffix 변경).
+3. **AppProject IngressClass**: `kubectl get appproject infra -n argocd -o yaml | grep -A1 IngressClass` 로 whitelist 반영 확인.
+4. **Traefik drift**: `kubectl -n argocd get application traefik -o jsonpath='{.status.sync.status}'` → `Synced` 유지. `helm history traefik -n traefik-system`에서 새 revision 없음 확인 (values 무변경).
+5. **PostgreSQL Runbook**: 다음 Renovate PR(postgresql chart bump) 시 `docs/runbooks/postgresql-helm-upgrade.md` 절차 적용.
 
 각 Task 진행 시 `docs/plans/2026-04-18-grafana-dashboard-improvement.md` 원본 plan의 해당 Task 참조.
 
