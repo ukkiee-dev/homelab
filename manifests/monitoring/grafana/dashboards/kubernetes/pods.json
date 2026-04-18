@@ -2988,7 +2988,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Kubernetes / Views / Pods",
-  "uid": null,
+  "uid": "k8s-pods",
   "version": 39,
   "weekStart": "",
   "gnetId": 15760,

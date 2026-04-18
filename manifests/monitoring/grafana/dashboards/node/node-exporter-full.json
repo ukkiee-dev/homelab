@@ -16010,7 +16010,7 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "Node Exporter Full",
-  "uid": null,
+  "uid": "node-exporter-full",
   "version": 100,
   "weekStart": "",
   "gnetId": 1860

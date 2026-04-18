@@ -4897,7 +4897,7 @@
   },
   "timezone": "browser",
   "title": "Kube State Metrics v2",
-  "uid": null,
+  "uid": "kube-state-metrics",
   "version": 2,
   "weekStart": ""
 }

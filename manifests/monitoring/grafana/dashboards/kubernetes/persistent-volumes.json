@@ -1642,6 +1642,6 @@
   "timepicker": {},
   "timezone": "",
   "title": "kubernetes-persistent-volumes-custom",
-  "uid": null,
+  "uid": "k8s-pvc",
   "version": 2
 }

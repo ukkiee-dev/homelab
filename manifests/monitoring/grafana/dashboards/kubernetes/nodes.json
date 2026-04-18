@@ -4013,7 +4013,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Kubernetes / Views / Nodes",
-  "uid": null,
+  "uid": "k8s-nodes",
   "version": 40,
   "weekStart": "",
   "gnetId": 15759,

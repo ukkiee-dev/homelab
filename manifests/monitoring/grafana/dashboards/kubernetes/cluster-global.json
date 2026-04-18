@@ -3555,7 +3555,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Kubernetes / Views / Global",
-  "uid": null,
+  "uid": "k8s-cluster-global",
   "version": 43,
   "weekStart": "",
   "gnetId": 15757,

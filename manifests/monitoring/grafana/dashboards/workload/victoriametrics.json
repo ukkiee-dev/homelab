@@ -8740,7 +8740,7 @@
   },
   "timezone": "browser",
   "title": "VictoriaMetrics - single-node",
-  "uid": null,
+  "uid": "victoriametrics-single",
   "version": 1,
   "weekStart": "",
   "gnetId": 10229
