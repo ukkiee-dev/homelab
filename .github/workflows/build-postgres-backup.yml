@@ -1,0 +1,131 @@
+name: Build postgres-backup image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker/postgres-backup/**"
+      - ".github/workflows/build-postgres-backup.yml"
+  pull_request:
+    paths:
+      - "docker/postgres-backup/**"
+      - ".github/workflows/build-postgres-backup.yml"
+  schedule:
+    # 매월 1일 09:00 KST (00:00 UTC) — base 이미지 보안 패치 정기 rebuild
+    - cron: "0 0 1 * *"
+  workflow_dispatch:
+    inputs:
+      push:
+        description: "Push image to GHCR (false = build only, for verification)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-postgres-backup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract versions from Dockerfile
+        id: versions
+        run: |
+          set -euo pipefail
+          POSTGRES_TAG=$(grep -E '^FROM postgres:' docker/postgres-backup/Dockerfile | awk -F: '{print $2}')
+          RCLONE_VERSION=$(grep -E '^ARG RCLONE_VERSION=' docker/postgres-backup/Dockerfile | cut -d= -f2)
+          echo "postgres_tag=${POSTGRES_TAG}" >> "$GITHUB_OUTPUT"
+          echo "rclone_version=${RCLONE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Postgres tag:  ${POSTGRES_TAG}"
+          echo "Rclone version: ${RCLONE_VERSION}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request' && (github.event.inputs.push != 'false')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: tags
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/postgres-backup
+          POSTGRES_TAG: ${{ steps.versions.outputs.postgres_tag }}
+          RCLONE_VERSION: ${{ steps.versions.outputs.rclone_version }}
+          SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${SHA::7}"
+          COMPOSITE="${POSTGRES_TAG}-rclone${RCLONE_VERSION}"
+
+          TAGS=(
+            "${IMAGE}:${COMPOSITE}"
+            "${IMAGE}:${COMPOSITE}-${SHORT_SHA}"
+          )
+          if [ "${REF}" = "refs/heads/main" ]; then
+            TAGS+=("${IMAGE}:latest")
+          fi
+
+          IFS=','; echo "tags=${TAGS[*]}" >> "$GITHUB_OUTPUT"
+          echo "composite=${COMPOSITE}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${TAGS[@]}"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/postgres-backup
+          file: docker/postgres-backup/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && (github.event.inputs.push != 'false') }}
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Smoke test (pg_dump + rclone present)
+        if: github.event_name == 'pull_request' || github.event.inputs.push == 'false'
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64 \
+            --load \
+            --tag local-smoke:test \
+            docker/postgres-backup
+          docker run --rm local-smoke:test pg_dump --version
+          docker run --rm local-smoke:test rclone version
+
+      - name: Summary
+        env:
+          COMPOSITE: ${{ steps.tags.outputs.composite }}
+          POSTGRES_TAG: ${{ steps.versions.outputs.postgres_tag }}
+          RCLONE_VERSION: ${{ steps.versions.outputs.rclone_version }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_INPUT: ${{ github.event.inputs.push }}
+        run: |
+          {
+            echo "### postgres-backup image"
+            echo ""
+            echo "- Composite tag: \`${COMPOSITE}\`"
+            echo "- Postgres: \`${POSTGRES_TAG}\`"
+            echo "- Rclone: \`${RCLONE_VERSION}\`"
+            if [ "${EVENT_NAME}" != "pull_request" ] && [ "${PUSH_INPUT}" != "false" ]; then
+              echo "- Pushed: \`true\`"
+            else
+              echo "- Pushed: \`false\` (PR build or manual skip)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

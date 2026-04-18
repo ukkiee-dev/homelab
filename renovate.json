@@ -10,12 +10,29 @@
   "argocd": {
     "fileMatch": ["argocd/.+\\.yaml$"]
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track ARG versions in Dockerfiles under docker/ (e.g., rclone)",
+      "fileMatch": ["^docker/.+/Dockerfile$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?:\\s+extractVersion=(?<extractVersion>.*?))?\\s+ARG\\s+\\S+=(?<currentValue>.+?)\\s"
+      ]
+    }
+  ],
   "packageRules": [
     {
       "description": "Auto-merge patch updates for non-critical services",
       "matchUpdateTypes": ["patch"],
       "matchPackagePatterns": ["homepage", "uptime-kuma"],
       "automerge": true
+    },
+    {
+      "description": "rclone + postgres-backup base image — group together, manual review",
+      "matchFileNames": ["docker/postgres-backup/Dockerfile"],
+      "groupName": "postgres-backup image",
+      "automerge": false,
+      "labels": ["dependencies", "docker-image"]
     },
     {
       "description": "Group all infrastructure updates",
