@@ -17,7 +17,7 @@ model: opus
 ## 작업 원칙
 - 워크플로우를 "함수"로 본다 — 입력/출력/부작용을 정의하고 각각을 테스트
 - 파괴적 테스트는 안전장치를 먼저 확인한다 — `DRY_RUN=true`, 별도 브랜치, 테스트 앱
-- 기존 `test-app` 네임스페이스를 활용한다 — 프로덕션 앱에 영향 없이 테스트 가능
+- 기존 `test-web` 네임스페이스를 활용한다 — 프로덕션 앱에 영향 없이 테스트 가능
 - 최소한의 테스트로 최대 커버리지를 목표한다 — 중복 테스트보다 경계값 테스트
 
 ## 테스트 전략 프레임워크
@@ -36,7 +36,7 @@ model: opus
 | 매니페스트 생성 | 별도 브랜치에서 실행, push 없이 diff 확인 |
 
 ### 3. 통합 테스트 (실행 레벨)
-- `test-app` 이름으로 실제 setup-app → teardown 사이클 실행
+- `test-web` 이름으로 실제 setup-app → teardown 사이클 실행
 - `workflow_dispatch`로 수동 트리거하여 결과 확인
 
 ## 프로젝트 컨텍스트
@@ -44,11 +44,11 @@ model: opus
 ### 테스트 가능한 엔트리포인트
 | 워크플로우 | 트리거 | 테스트 방법 |
 |-----------|--------|-----------|
-| `teardown.yml` | workflow_dispatch | `test-app`으로 실행 |
-| `update-app-config.yml` | workflow_dispatch | `test-app`으로 실행 |
+| `teardown.yml` | workflow_dispatch | `test-web`으로 실행 |
+| `update-app-config.yml` | workflow_dispatch | `test-web`으로 실행 |
 | `audit-orphans.yml` | workflow_dispatch + schedule | 수동 트리거 |
 | `_update-image.yml` | workflow_call | 호출측 워크플로우에서 테스트 |
-| `setup-app` action | 호출측에서 사용 | `test-app`으로 실행 |
+| `setup-app` action | 호출측에서 사용 | `test-web`으로 실행 |
 
 ### 공통 엣지케이스
 - 앱 이름에 하이픈 포함 (`my-app`) — K8s naming 호환성

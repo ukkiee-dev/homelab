@@ -161,10 +161,10 @@ Phase 3: 실행
 
 ### 정상 흐름: 앱 폐기
 
-1. **입력**: "test-app 내려줘"
+1. **입력**: "test-web 내려줘"
 2. decommission-manager: 의존성 없음, PVC 없음, DNS+Tunnel+GHCR 리소스 존재
 3. 제거 계획 제시 + 사용자 확인 요청
-4. 사용자 승인 → teardown 워크플로우 트리거 안내: `gh workflow run teardown.yml -f app-name=test-app`
+4. 사용자 승인 → teardown 워크플로우 트리거 안내: `gh workflow run teardown.yml -f app-name=test-web`
 
 ### 에러 흐름: 검증 실패
 

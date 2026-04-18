@@ -14,7 +14,7 @@
     {
       "description": "Auto-merge patch updates for non-critical services",
       "matchUpdateTypes": ["patch"],
-      "matchPackagePatterns": ["homepage", "dozzle", "uptime-kuma"],
+      "matchPackagePatterns": ["homepage", "uptime-kuma"],
       "automerge": true
     },
     {
