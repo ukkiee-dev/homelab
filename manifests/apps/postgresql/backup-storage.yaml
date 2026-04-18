@@ -1,0 +1,56 @@
+---
+# Cluster-scoped: StorageClass for external SSD (WaitForFirstConsumer, Retain)
+# kustomize의 namespace 필드는 cluster-scoped 리소스에 적용되지 않으므로 안전하다.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: external-ssd
+  labels:
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+---
+# Cluster-scoped: 정적 PV, hostPath는 OrbStack /mnt/mac 마운트 경유로 Mac 호스트의 외장 SSD 연결
+# 경로는 사용자 수동 생성 완료: /mnt/mac/Volumes/ukkiee/homelab/backups/postgresql/{daily,weekly,monthly}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgresql-backup-external-ssd
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes: [ReadWriteOnce]
+  storageClassName: external-ssd
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /mnt/mac/Volumes/ukkiee/homelab/backups/postgresql
+    type: DirectoryOrCreate
+  claimRef:
+    name: postgresql-backups-ssd
+    namespace: apps
+---
+# Namespaced: CronJob이 마운트할 PVC, 위 PV에 정적 바인딩(volumeName)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-backups-ssd
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: external-ssd
+  volumeName: postgresql-backup-external-ssd

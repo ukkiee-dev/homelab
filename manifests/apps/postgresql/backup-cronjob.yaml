@@ -18,6 +18,12 @@ spec:
       ttlSecondsAfterFinished: 600
       backoffLimit: 1
       template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgresql-backup
+            app.kubernetes.io/component: backup
+            app.kubernetes.io/part-of: homelab
+            app.kubernetes.io/managed-by: argocd
         spec:
           priorityClassName: batch-low
           restartPolicy: Never
@@ -27,49 +33,108 @@ spec:
               type: RuntimeDefault
           containers:
             - name: pgdump
-              image: bitnami/postgresql:latest
+              image: rclone/rclone:1.69
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  #!/bin/sh
+                  set -e
+                  echo "=== postgresql-backup started at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+
+                  # 1. Tools (rclone 이미지 기본 + psql client 추가)
+                  apk add --no-cache postgresql-client >/dev/null
+
+                  # 2. DB 리스트 동적 조회 (시스템 DB 제외)
+                  DBS=$(PGPASSWORD="$PG_PASSWORD" psql -h postgresql -U postgres -tAc \
+                    "SELECT datname FROM pg_database WHERE datistemplate=false AND datname!='postgres';")
+                  echo "Discovered databases: $DBS"
+
+                  TS=$(date -u +%Y%m%dT%H%M%SZ)
+                  TMP=/tmp/dumps
+                  mkdir -p "$TMP"
+
+                  # 3. 각 DB를 pg_dump -Fc (custom format, 압축됨)
+                  for DB in $DBS; do
+                    echo "Dumping $DB ..."
+                    PGPASSWORD="$PG_PASSWORD" pg_dump -h postgresql -U postgres -Fc -d "$DB" \
+                      > "$TMP/${DB}-${TS}.dump"
+                    echo "  -> $(wc -c <"$TMP/${DB}-${TS}.dump") bytes"
+                  done
+
+                  # 4. 글로벌 오브젝트(role, grant) 별도
+                  PGPASSWORD="$PG_PASSWORD" pg_dumpall -h postgresql -U postgres --globals-only \
+                    > "$TMP/globals-${TS}.sql"
+                  echo "Globals dumped: $(wc -c <"$TMP/globals-${TS}.sql") bytes"
+
+                  # 5. 외장 SSD 로컬 저장 (3일 보존)
+                  cp "$TMP"/*.dump "$TMP"/*.sql /backups/
+                  find /backups -type f \( -name "*.dump" -o -name "*.sql" \) -mtime +3 -delete
+
+                  # 6. rclone 설정 (env 주입, 파일 없이도 가능하지만 config 파일이 안정적)
+                  mkdir -p /root/.config/rclone
+                  cat > /root/.config/rclone/rclone.conf <<EOF
+                  [r2]
+                  type = s3
+                  provider = Cloudflare
+                  access_key_id = $R2_ACCESS_KEY_ID
+                  secret_access_key = $R2_SECRET_ACCESS_KEY
+                  endpoint = $R2_ENDPOINT
+                  region = auto
+                  EOF
+
+                  BUCKET=homelab-postgresql-backup
+
+                  # 7. R2 3계층 업로드 (daily는 항상, weekly는 일요일, monthly는 1일)
+                  echo "Uploading to r2:$BUCKET/daily/ ..."
+                  rclone copy "$TMP/" "r2:$BUCKET/daily/" --s3-no-check-bucket
+
+                  if [ "$(date -u +%u)" = "7" ]; then
+                    echo "Sunday -- also uploading to weekly/"
+                    rclone copy "$TMP/" "r2:$BUCKET/weekly/" --s3-no-check-bucket
+                  fi
+
+                  if [ "$(date -u +%d)" = "01" ]; then
+                    echo "1st of month -- also uploading to monthly/"
+                    rclone copy "$TMP/" "r2:$BUCKET/monthly/" --s3-no-check-bucket
+                  fi
+
+                  # 8. 정리
+                  rm -rf "$TMP"
+                  echo "=== postgresql-backup complete at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+                  ls -lh /backups/
               resources:
                 requests:
                   cpu: 25m
-                  memory: 48Mi
+                  memory: 64Mi
                 limits:
                   cpu: 200m
-                  memory: 96Mi
-              command:
-                - sh
-                - -c
-                - |
-                  echo "=== pg_dump started at $(date) ==="
-                  # api database
-                  PGPASSWORD="$PG_PASSWORD" pg_dump -h postgresql -U postgres -Fc api > /backups/api-$(date +%Y%m%d).sql
-                  # 7일 이전 삭제
-                  find /backups -name "*.sql" -mtime +7 -delete
-                  echo "=== pg_dump completed ==="
-                  ls -lh /backups/
+                  memory: 128Mi
               env:
                 - name: PG_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: postgresql-auth
                       key: postgres-password
+                - name: R2_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgresql-backup-r2
+                      key: access_key_id
+                - name: R2_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgresql-backup-r2
+                      key: secret_access_key
+                - name: R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgresql-backup-r2
+                      key: endpoint
               volumeMounts:
                 - name: backups
                   mountPath: /backups
           volumes:
             - name: backups
               persistentVolumeClaim:
-                claimName: postgresql-backups
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgresql-backups
-  namespace: apps
-  labels:
-    app.kubernetes.io/name: postgresql-backup
-    app.kubernetes.io/part-of: homelab
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: 1Gi
+                claimName: postgresql-backups-ssd
