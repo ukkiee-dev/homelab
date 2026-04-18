@@ -33,7 +33,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: pgdump
-              image: rclone/rclone:1.69
+              image: postgres:18-alpine
               command:
                 - /bin/sh
                 - -c
@@ -42,8 +42,20 @@ spec:
                   set -e
                   echo "=== postgresql-backup started at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
 
-                  # 1. Tools (rclone 이미지 기본 + psql client 추가)
-                  apk add --no-cache postgresql-client >/dev/null
+                  # 1. Tools — postgres:18-alpine에 psql/pg_dump v18 내장,
+                  #    rclone은 공식 binary 다운로드 (apk에 없거나 구버전)
+                  apk add --no-cache curl unzip ca-certificates >/dev/null
+                  RCLONE_VERSION=1.69.0
+                  ARCH=$(uname -m)
+                  case "$ARCH" in
+                    aarch64|arm64) RC_ARCH=arm64 ;;
+                    x86_64|amd64)  RC_ARCH=amd64 ;;
+                    *) echo "unsupported arch: $ARCH"; exit 1 ;;
+                  esac
+                  curl -fsSL "https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${RC_ARCH}.zip" -o /tmp/rclone.zip
+                  unzip -q /tmp/rclone.zip -d /tmp/
+                  install -m 755 "/tmp/rclone-v${RCLONE_VERSION}-linux-${RC_ARCH}/rclone" /usr/local/bin/rclone
+                  rm -rf /tmp/rclone.zip "/tmp/rclone-v${RCLONE_VERSION}-linux-${RC_ARCH}"
 
                   # 2. DB 리스트 동적 조회 (시스템 DB 제외)
                   DBS=$(PGPASSWORD="$PG_PASSWORD" psql -h postgresql -U postgres -tAc \
