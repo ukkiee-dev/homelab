@@ -7,37 +7,38 @@ resource "cloudflare_ruleset" "cache_rules" {
   kind        = "zone"
   phase       = "http_request_cache_settings"
 
-  # 정적 자산 장기 캐싱
-  rules {
-    ref         = "cache_static_assets"
-    description = "Cache static assets (30d edge, 7d browser)"
-    expression  = <<-EOT
+  rules = [
+    # 정적 자산 장기 캐싱
+    {
+      ref         = "cache_static_assets"
+      description = "Cache static assets (30d edge, 7d browser)"
+      expression  = <<-EOT
       (http.request.uri.path.extension in {"js" "css" "png" "jpg" "jpeg" "gif" "svg" "woff2" "woff" "ico" "webp" "avif"})
     EOT
-    action      = "set_cache_settings"
-    action_parameters {
-      cache = true
-      edge_ttl {
-        mode    = "override_origin"
-        default = 2592000
+      action      = "set_cache_settings"
+      enabled     = true
+      action_parameters = {
+        cache = true
+        browser_ttl = {
+          mode    = "override_origin"
+          default = 604800
+        }
+        edge_ttl = {
+          mode    = "override_origin"
+          default = 2592000
+        }
       }
-      browser_ttl {
-        mode    = "override_origin"
-        default = 604800
+    },
+    # API 경로 캐시 바이패스
+    {
+      ref         = "bypass_api_cache"
+      description = "Bypass cache for API endpoints"
+      expression  = "(starts_with(http.request.uri.path, \"/api/\"))"
+      action      = "set_cache_settings"
+      enabled     = true
+      action_parameters = {
+        cache = false
       }
     }
-    enabled = true
-  }
-
-  # API 경로 캐시 바이패스
-  rules {
-    ref         = "bypass_api_cache"
-    description = "Bypass cache for API endpoints"
-    expression  = "(starts_with(http.request.uri.path, \"/api/\"))"
-    action      = "set_cache_settings"
-    action_parameters {
-      cache = false
-    }
-    enabled = true
-  }
+  ]
 }
