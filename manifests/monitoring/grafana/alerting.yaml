@@ -536,3 +536,149 @@ data:
               summary: "노드 CPU 사용률 90% 초과"
               dashboardUid: "k8s-nodes"
               panelId: "2"
+
+      - orgId: 1
+        name: argocd-alerts
+        folder: Kubernetes
+        interval: 1m
+        rules:
+          - uid: argocd-sync-failed
+            title: ArgoCD Sync 실패
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: sum by(name) (increase(argocd_app_sync_total{phase="Failed"}[5m]))
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 0s
+            labels:
+              severity: critical
+            annotations:
+              summary: "ArgoCD Application {{ $labels.name }} sync 실패"
+              dashboardUid: "infra-alerts-overview"
+              panelId: "1"
+
+          - uid: argocd-app-out-of-sync
+            title: ArgoCD OutOfSync 지속
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: argocd_app_info{sync_status="OutOfSync"} > 0
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "ArgoCD Application {{ $labels.name }} 15분 이상 OutOfSync"
+              dashboardUid: "infra-alerts-overview"
+              panelId: "1"
+
+          - uid: argocd-app-degraded
+            title: ArgoCD Application Degraded
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: argocd_app_info{health_status="Degraded"} > 0
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "ArgoCD Application {{ $labels.name }} Degraded 상태"
+              dashboardUid: "infra-alerts-overview"
+              panelId: "1"

@@ -23,6 +23,12 @@ server:
     limits:
       cpu: 200m
       memory: 96Mi
+  metrics:
+    enabled: true
+    service:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
 
 controller:
   resources:
@@ -32,6 +38,12 @@ controller:
     limits:
       cpu: 500m
       memory: 768Mi
+  metrics:
+    enabled: true
+    service:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8082"
 
 repoServer:
   resources:
@@ -41,6 +53,12 @@ repoServer:
     limits:
       cpu: 200m
       memory: 192Mi
+  metrics:
+    enabled: true
+    service:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8084"
 
 redis:
   resources:
