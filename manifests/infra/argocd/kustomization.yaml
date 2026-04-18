@@ -10,5 +10,4 @@ resources:
   - appproject-monitoring.yaml
   - ingressroute.yaml
   - ingressroute-api.yaml
-  - image-updater.yaml
   - network-policy.yaml
