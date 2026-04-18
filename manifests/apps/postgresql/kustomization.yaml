@@ -3,3 +3,4 @@ kind: Kustomization
 namespace: apps
 resources:
   - backup-cronjob.yaml
+  - sealed-secret-r2.yaml
