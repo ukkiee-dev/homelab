@@ -22,6 +22,9 @@ sealed-secrets-key-backup.yaml
 # Workspace (임시 리서치 산출물)
 _workspace/
 
+# Claude Code 런타임 파일
+.claude/scheduled_tasks.lock
+
 # Terraform
 **/.terraform/
 *.tfplan
