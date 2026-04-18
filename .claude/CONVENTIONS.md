@@ -47,7 +47,7 @@
 | `-simulator` | **가상 시나리오 실행** — 실제 실행 없이 결과 예측 | 모델 기반 | dr-simulator |
 | `-diagrammer` | **다이어그램 생성** | 시각화 기반 | arch-diagrammer |
 | `-optimizer` | **쿼리·설정 최적화** | 비용 기반 | query-optimizer |
-| `-writer` | **문서·Runbook 작성** | 서식 기반 | runbook-writer |
+| `-writer` | **문서·Runbook·리포트 작성** | 서식 기반 | runbook-writer, postmortem-writer |
 | `-architect` | **초기 설계** — 요구사항을 설계 문서로 전환 | 요구사항 기반 | app-architect |
 | `-manager` | **파괴적 작업·의존성 관리** | 안전 기반 | decommission-manager |
 | `-ops` | **운영·트러블슈팅** — 실시간 클러스터 진단 | 증상 기반 | cluster-ops |
@@ -71,10 +71,10 @@
 | `yellow` | Auditor + Debugger (주의·경고 의미) | network-auditor, secret-auditor, container-auditor, access-auditor, backup-verifier, pipeline-debugger |
 | `green` | Engineer (긍정·생성 의미) | manifest-engineer, sizing-engineer, alert-engineer, iac-engineer, provisioning-engineer, workflow-builder |
 | `cyan` | Researcher + Analyst (탐색·분석 의미) | web-researcher, academic-researcher, community-researcher, code-analyst, resource-analyst |
-| `magenta` | Designer + Generator (창의·설계 의미) | dashboard-designer, arch-diagrammer, runbook-writer, query-optimizer, scheduling-strategist, app-architect |
+| `magenta` | Designer + Generator (창의·설계 의미) | dashboard-designer, arch-diagrammer, runbook-writer, postmortem-writer, query-optimizer, scheduling-strategist, app-architect |
 | `red` | Critical·파괴적·시뮬레이션 (중대 리스크) | security-reviewer, dr-simulator, decommission-manager |
 
-**분포 목표**: 특정 색상이 전체의 40%를 넘지 않도록 한다. 현재 38개 에이전트 기준: blue 12, yellow 6, magenta 6, green 6, cyan 5, red 3.
+**분포 목표**: 특정 색상이 전체의 40%를 넘지 않도록 한다. 현재 39개 에이전트 기준: blue 12, magenta 7, yellow 6, green 6, cyan 5, red 3.
 
 ---
 
@@ -179,7 +179,9 @@ version: "1.0.0"
 | `app-lifecycle` | "기존 앱 매니페스트 수정·트러블슈팅은 homelab-ops가 처리한다" |
 | `infra-security-audit` | "빠른 일반 보안 리뷰는 homelab-ops, 코드 보안은 security-reviewer 에이전트가 담당한다" |
 | `code-review` | "단순 린팅/포매팅에는 트리거하지 않는다" |
-| `runbook-gen` | "장애 대응은 cluster-diagnose, 매니페스트 수정은 homelab-ops가 담당한다" |
+| `runbook-gen` | "장애 대응은 cluster-diagnose, 매니페스트 수정은 homelab-ops, 사후 분석은 incident-postmortem이 담당한다" |
+| `incident-postmortem` | "라이브 트러블슈팅은 homelab-ops, 평상시 운영 절차 문서화는 runbook-gen이 담당한다" |
+| `upgrade-planner` | "patch/minor 자동 업데이트는 Renovate가, Terraform provider 업그레이드는 terraform-iac가, GHA actions 업그레이드는 gha-cicd가 담당한다 — major K8s 컴포넌트 전용" |
 | `resource-optimizer` | "매니페스트 생성은 k8s-manifest-generator, 보안 감사는 infra-security-audit" |
 | `monitoring-ops` | "단순 kubectl 명령이나 매니페스트 수정에는 트리거하지 않는다" |
 
@@ -190,10 +192,10 @@ version: "1.0.0"
 에이전트가 프로젝트 특유 컨벤션(GitOps, ArgoCD selfHeal, 라벨 4종 등)을 따르게 하려면 프롬프트에 **참조 경로를 주입**한다.
 
 표준 참조 경로:
-- `/Users/ukyi/homelab/.claude/skills/homelab-ops/references/project-conventions.md` — 프로젝트 전반 컨벤션
-- `/Users/ukyi/homelab/.claude/skills/infra-security-audit/references/severity-criteria.md` — 보안 심각도 분류
-- `/Users/ukyi/homelab/.claude/skills/gha-cicd/references/workflow-patterns.md` — GHA 패턴
-- `/Users/ukyi/homelab/.claude/skills/runbook-gen/references/runbook-template.md` — Runbook 서식
+- `.claude/skills/homelab-ops/references/project-conventions.md` — 프로젝트 전반 컨벤션
+- `.claude/skills/infra-security-audit/references/severity-criteria.md` — 보안 심각도 분류
+- `.claude/skills/gha-cicd/references/workflow-patterns.md` — GHA 패턴
+- `.claude/skills/runbook-gen/references/runbook-template.md` — Runbook 서식
 
 ---
 
