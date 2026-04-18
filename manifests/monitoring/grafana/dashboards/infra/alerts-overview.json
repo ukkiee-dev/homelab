@@ -1,0 +1,411 @@
+{
+  "uid": "infra-alerts-overview",
+  "title": "Alert Overview",
+  "tags": ["alerts", "grafana", "infra"],
+  "timezone": "Asia/Seoul",
+  "schemaVersion": 39,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Firing Alerts",
+      "description": "Number of alert instances currently in the 'alerting' state (Grafana unified alerting). Any value >= 1 means something is actively firing. Source: grafana_alerting_alerts{state=\"alerting\"}.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(grafana_alerting_alerts{state=\"alerting\"})",
+          "legendFormat": "firing",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Pending Alerts",
+      "description": "Alert instances in the 'pending' state — the condition is true but the 'for' duration has not yet elapsed. Transient spikes are normal; sustained pending counts indicate flapping conditions. Source: grafana_alerting_alerts{state=\"pending\"}.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(grafana_alerting_alerts{state=\"pending\"})",
+          "legendFormat": "pending",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1}
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Active Rules",
+      "description": "Total number of active alert rules loaded in Grafana (across all rule groups). Should match the count of managed alert rules in Git. Source: grafana_alerting_rule_group_rules{state=\"active\", type=\"alerting\"}.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(grafana_alerting_rule_group_rules{state=\"active\", type=\"alerting\"})",
+          "legendFormat": "active rules",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Scheduler Lag",
+      "description": "How far behind the alert rule scheduler is against its tick interval. Healthy Grafana keeps this near 0; values > 10s mean the scheduler can't keep up with rule evaluations. Source: grafana_alerting_scheduler_behind_seconds.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(grafana_alerting_scheduler_behind_seconds)",
+          "legendFormat": "lag",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "s",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 2},
+              {"color": "red", "value": 10}
+            ]
+          },
+          "noValue": "N/A"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Alert State Over Time",
+      "description": "Alert instance count per state over 24h. Stacked so the total height is the full rule population. Spikes of red (alerting) or orange (error) indicate active incidents; sustained yellow (pending) means flapping conditions.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(state) (grafana_alerting_alerts)",
+          "legendFormat": "{{state}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 30,
+            "stacking": {"mode": "normal", "group": "A"},
+            "showPoints": "never",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "alerting"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "pending"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "error"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "nodata"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "normal"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Rule Evaluation Failure Rate",
+      "description": "Rate of alert rule evaluation failures per second (5m window). Must stay at 0 — any non-zero value means Grafana failed to evaluate a rule (bad PromQL, datasource unreachable, etc) and the alert may be silently broken. Source: grafana_alerting_rule_evaluation_failures_total.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(org) (rate(grafana_alerting_rule_evaluation_failures_total[5m]))",
+          "legendFormat": "org {{org}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "ops",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "stacking": {"mode": "none", "group": "A"},
+            "showPoints": "never",
+            "axisPlacement": "auto",
+            "thresholdsStyle": {"mode": "line"}
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 0.0001}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Rule Evaluation Latency (p95)",
+      "description": "95th percentile of rule evaluation duration (seconds) computed from histogram buckets over a 5m window. Sustained p95 > 1s means rule groups are slow (expensive PromQL or slow datasource) and may cause scheduler lag. Source: grafana_alerting_rule_evaluation_duration_seconds_bucket.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 13},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(grafana_alerting_rule_evaluation_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.50, sum by(le) (rate(grafana_alerting_rule_evaluation_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "s",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {"mode": "none", "group": "A"},
+            "showPoints": "never",
+            "axisPlacement": "auto",
+            "thresholdsStyle": {"mode": "line"}
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 5}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Rules per Group",
+      "description": "Number of active alert rules in each rule group. Flat lines are expected in steady state; drops indicate rule deletion, spikes indicate rule addition. Helps spot unintentional removals from Git.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 13},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "grafana_alerting_rule_group_rules{state=\"active\", type=\"alerting\"}",
+          "legendFormat": "{{rule_group}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "stacking": {"mode": "none", "group": "A"},
+            "showPoints": "never",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
