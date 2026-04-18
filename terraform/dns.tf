@@ -2,7 +2,6 @@ locals {
   apps = jsondecode(file("${path.module}/apps.json"))
 }
 
-
 resource "cloudflare_dns_record" "apps" {
   for_each = local.apps
 
@@ -12,9 +11,4 @@ resource "cloudflare_dns_record" "apps" {
   type    = "CNAME"
   proxied = true
   ttl     = 1
-}
-
-moved {
-  from = cloudflare_record.apps
-  to   = cloudflare_dns_record.apps
 }
