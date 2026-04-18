@@ -127,6 +127,11 @@ providers:
   kubernetesIngress:
     enabled: false
 
+# kubernetesIngress.enabled=false 이므로 IngressClass 리소스 불필요.
+# ArgoCD AppProject 'infra'가 IngressClass 미허용이라 sync 실패 회피용.
+ingressClass:
+  enabled: false
+
 metrics:
   prometheus:
     entryPoint: metrics
