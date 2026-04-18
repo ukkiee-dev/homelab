@@ -79,8 +79,10 @@ spec:
                     > "$TMP/globals-${TS}.sql"
                   echo "Globals dumped: $(wc -c <"$TMP/globals-${TS}.sql") bytes"
 
-                  # 5. 외장 SSD 로컬 저장 (3일 보존)
-                  cp "$TMP"/*.dump "$TMP"/*.sql /backups/
+                  # 5. 외장 SSD 로컬 저장 (3일 보존) — find로 POSIX 안전하게
+                  #    (DB 없는 초기 상태에서 *.dump 미존재 시 globbing 실패 방지)
+                  find "$TMP" -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql" \) \
+                    -exec cp {} /backups/ \;
                   find /backups -type f \( -name "*.dump" -o -name "*.sql" \) -mtime +3 -delete
 
                   # 6. rclone 설정 (env 주입, 파일 없이도 가능하지만 config 파일이 안정적)
