@@ -1,0 +1,476 @@
+{
+  "uid": "infra-coredns",
+  "title": "CoreDNS",
+  "tags": ["coredns", "dns", "infra"],
+  "timezone": "Asia/Seoul",
+  "schemaVersion": 39,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
+        "query": {
+          "query": "label_values(coredns_dns_requests_total, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "label_values(coredns_dns_requests_total, instance)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Query Rate (QPS)",
+      "description": "Total DNS queries per second across selected CoreDNS instances. Sourced from coredns_dns_requests_total.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(coredns_dns_requests_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "qps",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "reqps",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 200},
+              {"color": "red", "value": 1000}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "NXDOMAIN Ratio",
+      "description": "Percentage of responses with rcode=NXDOMAIN (hostname not found). Chronically high values indicate misconfigured search domains or broken upstream resolution.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(coredns_dns_responses_total{instance=~\"$instance\", rcode=\"NXDOMAIN\"}[5m])) / clamp_min(sum(rate(coredns_dns_responses_total{instance=~\"$instance\"}[5m])), 0.001) * 100",
+          "legendFormat": "nxdomain %",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 20},
+              {"color": "red", "value": 50}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Cache Hit Ratio",
+      "description": "Cache hit ratio = hits / (hits + misses). Higher is better — repeated queries are being served from cache rather than forwarded upstream.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(coredns_cache_hits_total{instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(coredns_cache_hits_total{instance=~\"$instance\"}[5m])) + sum(rate(coredns_cache_misses_total{instance=~\"$instance\"}[5m])), 0.001)",
+          "legendFormat": "hit ratio",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "percentunit",
+          "decimals": 2,
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "green", "value": 0.75}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Pod Restarts (1h)",
+      "description": "Total CoreDNS pod container restarts over the last hour. Non-zero means CoreDNS crashed — red at 3+ within 1h matches the coredns-restart alert rule.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"kube-system\", pod=~\"coredns.*\"}[1h]))",
+          "legendFormat": "restarts",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 3}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Request Rate by Query Type",
+      "description": "DNS query rate broken down by record type (A, AAAA, PTR, SRV, etc). Helps spot unusual traffic patterns — e.g. excessive AAAA lookups from dual-stack misconfiguration.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(type) (rate(coredns_dns_requests_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "{{type}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 30,
+            "stacking": {"mode": "normal", "group": "A"},
+            "showPoints": "never",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Response Code Distribution",
+      "description": "Response rate by rcode (NOERROR, NXDOMAIN, SERVFAIL). Spike in SERVFAIL = upstream DNS broken; spike in NXDOMAIN = clients asking for wrong hostnames.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(rcode) (rate(coredns_dns_responses_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "{{rcode}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "stacking": {"mode": "normal", "group": "A"},
+            "showPoints": "never",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "SERVFAIL"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "NXDOMAIN"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "NOERROR"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "P95 / P99 Request Duration",
+      "description": "95th and 99th percentile DNS query latency computed from the histogram. Healthy CoreDNS serves cached queries in microseconds — sustained P95 > 50ms indicates upstream resolution issues.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(coredns_dns_request_duration_seconds_bucket{instance=~\"$instance\"}[5m])))",
+          "legendFormat": "p95",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.99, sum by(le) (rate(coredns_dns_request_duration_seconds_bucket{instance=~\"$instance\"}[5m])))",
+          "legendFormat": "p99",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "axisPlacement": "auto"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.05},
+              {"color": "red", "value": 0.5}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Cache Hits vs Misses",
+      "description": "Cache hit and miss rates. Rising misses without rising hits suggests cache eviction pressure or new query patterns.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(coredns_cache_hits_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "hits",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(coredns_cache_misses_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "misses",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "hits"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "misses"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Pod Restarts (cumulative)",
+      "description": "Cumulative restart counter per CoreDNS pod. Any upward step means a restart occurred — cross-check against the coredns-restart alert.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "kube_pod_container_status_restarts_total{namespace=\"kube-system\", pod=~\"coredns.*\"}",
+          "legendFormat": "{{pod}}",
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"}
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull", "max"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "axisPlacement": "auto"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
