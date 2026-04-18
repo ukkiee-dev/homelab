@@ -1,7 +1,4 @@
 {
-  "argocd": {
-    "subdomain": "argo"
-  },
   "test-web": {
     "subdomain": "test-web"
   }
