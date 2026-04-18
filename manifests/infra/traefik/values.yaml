@@ -35,6 +35,12 @@ ports:
       default: true
     exposedPort: 443
     protocol: TCP
+  metrics:
+    port: 9100
+    expose:
+      default: false
+    exposedPort: 9100
+    protocol: TCP
 
 
 additionalArguments:
@@ -109,6 +115,10 @@ resources:
 service:
   spec:
     externalTrafficPolicy: Local
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9100"
+    prometheus.io/path: "/metrics"
 
 providers:
   kubernetesCRD:
@@ -116,3 +126,11 @@ providers:
     allowCrossNamespace: true
   kubernetesIngress:
     enabled: false
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    buckets: "0.1,0.3,1.2,5.0"
