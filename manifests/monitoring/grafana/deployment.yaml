@@ -103,6 +103,9 @@ spec:
             - name: dashboards-apps
               mountPath: /var/lib/grafana/dashboards/apps
               readOnly: true
+            - name: dashboards-infra
+              mountPath: /var/lib/grafana/dashboards/infra
+              readOnly: true
             - name: dashboards-kubernetes
               mountPath: /var/lib/grafana/dashboards/kubernetes
               readOnly: true
@@ -128,6 +131,9 @@ spec:
         - name: dashboards-apps
           configMap:
             name: grafana-dashboards-apps
+        - name: dashboards-infra
+          configMap:
+            name: grafana-dashboards-infra
         - name: dashboards-kubernetes
           configMap:
             name: grafana-dashboards-kubernetes
