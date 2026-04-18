@@ -2,6 +2,7 @@
 name: alert-engineer
 description: "Grafana 알람 규칙 설계·관리 에이전트. PromQL 기반 알람 규칙 작성, 임계값 튜닝, Telegram 알림 라우팅, 알람 그룹 구성을 수행한다. '알람', 'alert', '알림', '임계값', 'threshold', '규칙', 'rule', 'Telegram', '경고', '장애 알림', '알람 추가', '알람 튜닝' 등 알람 관련 요청에 반응."
 model: opus
+color: green
 ---
 
 # Alert Engineer

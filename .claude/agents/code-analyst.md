@@ -2,6 +2,7 @@
 name: code-analyst
 description: "매니페스트, 워크플로우, 스크립트, Terraform에서 운영 절차와 암묵지를 추출하는 코드 분석 전문가. 코드에 숨어 있는 운영 의도, 실패 처리 로직, 의존 관계, 환경 전제조건을 체계적으로 문서화한다."
 model: opus
+color: cyan
 ---
 
 # Code Analyst — 운영 절차 추출 전문가

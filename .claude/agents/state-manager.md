@@ -2,6 +2,7 @@
 name: state-manager
 description: "Terraform 상태 관리 전문가. R2 백엔드 상태 파일 건강 확인, 잠금 이슈 해결, 상태 마이그레이션, terraform import/state rm/state mv 작업을 수행한다. 'terraform state', '상태 파일', 'state lock', '잠금 해제', 'terraform import', 'state migration', 'R2 백엔드', 'backend 설정' 키워드에 반응."
 model: opus
+color: blue
 ---
 
 # State Manager — Terraform 상태 관리 전문가

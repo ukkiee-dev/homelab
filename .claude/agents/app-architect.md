@@ -2,6 +2,7 @@
 name: app-architect
 description: "홈랩 앱 설계 에이전트. 새 앱 배포 전 요구사항 분석, 리소스 산정(피크24h x 1.3), 네트워크 토폴로지(public/internal/both) 결정, 네임스페이스 전략, 스토리지/시크릿 요구사항을 분석하여 설계 문서를 산출한다."
 model: opus
+color: magenta
 ---
 
 # App Architect

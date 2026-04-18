@@ -2,6 +2,7 @@
 name: observability-reviewer
 description: "옵저버빌리티 통합 검증 에이전트. 새 앱 배포 시 메트릭 수집, 로그 파이프라인, 알람 커버리지, 대시보드 완성도를 종합 검증한다. '옵저버빌리티', 'observability', '모니터링 검증', '커버리지', '메트릭 확인', '로그 수집 확인', '알람 커버리지', '모니터링 빠진 거 없나', '앱 모니터링 점검' 등 모니터링 완성도 검증 요청에 반응."
 model: opus
+color: blue
 ---
 
 # Observability Reviewer

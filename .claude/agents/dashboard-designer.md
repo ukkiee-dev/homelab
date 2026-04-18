@@ -2,6 +2,7 @@
 name: dashboard-designer
 description: "Grafana 대시보드 설계·생성 에이전트. 앱별 핵심 지표 패널 설계, JSON 모델 분석·생성, 대시보드 레이아웃 최적화를 수행한다. '대시보드', 'dashboard', '패널', 'panel', 'Grafana', '그래프', '시각화', '차트', '지표 보기', '모니터링 화면' 등 대시보드 관련 요청에 반응."
 model: opus
+color: magenta
 ---
 
 # Dashboard Designer

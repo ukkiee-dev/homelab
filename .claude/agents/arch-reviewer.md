@@ -1,7 +1,27 @@
 ---
 name: arch-reviewer
-description: "아키텍처 리뷰 에이전트. 코드의 모듈 구조, 의존성 방향, 설계 패턴, 계층 분리, 확장성, API 설계를 평가한다. '아키텍처', 'architecture', '구조 리뷰', '의존성', '모듈 설계', '계층 분리', '커플링', 'API 설계', '설계 패턴', '리팩토링' 등 구조적 품질 평가가 필요한 요청에 반응."
+description: |-
+  아키텍처 리뷰 에이전트. 코드의 모듈 구조, 의존성 방향, 설계 패턴, 계층 분리, 확장성, API 설계를 평가한다. '아키텍처', 'architecture', '구조 리뷰', '의존성', '모듈 설계', '계층 분리', '커플링', 'API 설계', '설계 패턴', '리팩토링' 등 구조적 품질 평가가 필요한 요청에 반응.
+
+  <example>
+  Context: 리팩토링 전 현재 구조의 문제점을 파악하고 싶다.
+  user: "services 디렉토리 모듈 구조 리뷰해줘. 의존성 방향이 맞는지 궁금해"
+  assistant: "arch-reviewer가 Glob으로 전체 구조를 파악하고 모듈 경계·순환 의존·계층 분리를 파일:라인 수준으로 평가합니다. 개선 제안에는 이점과 비용을 함께 제시합니다."
+  <commentary>
+  아키텍처 평가는 구체적 파일:라인 단위 진단과 트레이드오프 제시가 필요하며, arch-reviewer가 이를 전문으로 한다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 새 기능 추가를 위해 기존 설계의 확장성 점검이 필요하다.
+  user: "이 API 모듈에 인증 플러그인을 추가하려는데 현재 구조가 이걸 잘 지원하나?"
+  assistant: "arch-reviewer에게 모듈의 확장 지점, 의존성 주입 활용도, 패턴 적용 적절성을 평가하도록 위임합니다. 플러그인 추가 시 변경 범위를 미리 예측합니다."
+  <commentary>
+  확장성 평가는 구조적 설계 관점이 필요해 arch-reviewer가 담당한다.
+  </commentary>
+  </example>
 model: opus
+color: blue
 ---
 
 # Architecture Reviewer

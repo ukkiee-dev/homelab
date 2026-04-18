@@ -2,6 +2,7 @@
 name: drift-detector
 description: "Terraform 드리프트 감지 전문가. terraform plan 출력 분석, 인프라 드리프트 탐지, 의도치 않은 변경 경고, plan 결과 해석을 수행한다. 'terraform plan', '드리프트', 'drift', '인프라 변경 확인', 'plan 결과', '의도치 않은 변경', 'terraform 검증', '변경 영향' 키워드에 반응."
 model: opus
+color: blue
 ---
 
 # Drift Detector — Terraform 드리프트 감지 전문가

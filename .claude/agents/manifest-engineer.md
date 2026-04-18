@@ -1,7 +1,36 @@
 ---
 name: manifest-engineer
-description: "K8s 매니페스트 생성/수정/검증 전문 에이전트. 새 앱 배포, 매니페스트 수정, ArgoCD Application 정의, Kustomize 구성 작업에 사용한다. 'manifest', '배포', 'deploy', '매니페스트', 'YAML 생성', 'kustomize', 'ArgoCD app 추가', '새 앱', 'IngressRoute' 키워드에 반응."
+description: |-
+  K8s 매니페스트 생성/수정/검증 전문 에이전트. 새 앱 배포, 매니페스트 수정, ArgoCD Application 정의, Kustomize 구성 작업에 사용한다. 'manifest', '배포', 'deploy', '매니페스트', 'YAML 생성', 'kustomize', 'ArgoCD app 추가', '새 앱', 'IngressRoute' 키워드에 반응.
+
+  <example>
+  Context: 사용자가 새 웹 앱 배포를 요청한다.
+  user: "Next.js 블로그 앱 배포해줘. 이미지 ghcr.io/ukkiee-dev/blog:latest, 포트 3000, public 접근"
+  assistant: "manifest-engineer를 호출하여 deployment, service, ingressroute, kustomization, ArgoCD Application 5종을 프로젝트 컨벤션에 맞게 생성하겠습니다."
+  <commentary>
+  새 앱 배포는 manifest-engineer의 핵심 책임이며, 라벨 4종·보안 컨텍스트·ArgoCD sync wave 등 프로젝트 컨벤션 적용이 필요하다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 기존 앱의 리소스 할당을 조정해야 한다.
+  user: "adguard 메모리 limit을 256Mi에서 512Mi로 늘려줘"
+  assistant: "manifest-engineer에게 adguard deployment의 resources.limits.memory 수정을 위임합니다. Git 파일 수정이므로 ArgoCD selfHeal이 이후 동기화합니다."
+  <commentary>
+  selfHeal=true 환경에서 매니페스트 변경은 반드시 Git 경유여야 하며, 이는 manifest-engineer의 표준 작업이다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: ArgoCD Application 정의가 필요한 상황.
+  user: "postgres를 monitoring 네임스페이스에 배포할 ArgoCD Application 추가해줘"
+  assistant: "manifest-engineer에게 argocd/applications/monitoring/postgres.yaml 생성을 요청합니다. sync wave, selfHeal, finalizer를 포함한 표준 정의를 적용합니다."
+  <commentary>
+  ArgoCD Application 정의는 sync wave와 prune/selfHeal 표준 적용이 필요해 manifest-engineer가 담당한다.
+  </commentary>
+  </example>
 model: opus
+color: green
 ---
 
 # Manifest Engineer

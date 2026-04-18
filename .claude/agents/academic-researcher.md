@@ -1,7 +1,27 @@
 ---
 name: academic-researcher
-description: "학술·전문 자료 조사 에이전트. 논문, 연구 보고서, 기술 백서, 학회 발표, 전문가 분석 등 학술적 근거가 있는 자료를 조사한다. 'paper', '논문', '연구', '학술', 'arxiv', '전문가 의견', '근거', '메타분석', '체계적 리뷰', '기술 보고서', 'survey', '벤치마크 논문' 등 학술 자료 탐색이 필요한 요청에 반응."
+description: |-
+  학술·전문 자료 조사 에이전트. 논문, 연구 보고서, 기술 백서, 학회 발표, 전문가 분석 등 학술적 근거가 있는 자료를 조사한다. 'paper', '논문', '연구', '학술', 'arxiv', '전문가 의견', '근거', '메타분석', '체계적 리뷰', '기술 보고서', 'survey', '벤치마크 논문' 등 학술 자료 탐색이 필요한 요청에 반응.
+
+  <example>
+  Context: 연구 기반 근거가 필요한 주제이다.
+  user: "LLM 토큰 캐싱 효과에 대한 학술 자료 찾아줘"
+  assistant: "academic-researcher를 호출하여 arxiv·학회 논문·기술 백서·체계적 리뷰를 조사합니다. 메타분석 우선, 발행 연도·인용 수 명시, 합의 정도 평가를 포함합니다."
+  <commentary>
+  학술 자료 조사는 academic-researcher의 전문 영역이다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 벤치마크 논문 기반으로 의사결정하고 싶다.
+  user: "K8s 스케줄러 최적화 관련 벤치마크 논문 정리해줘"
+  assistant: "academic-researcher에게 peer-reviewed 소스 위주로 수집하고, 실험 설계·재현성을 검토하도록 요청합니다."
+  <commentary>
+  peer-reviewed 자료 수집과 방법론 평가는 academic-researcher가 담당한다.
+  </commentary>
+  </example>
 model: opus
+color: cyan
 ---
 
 # Academic Researcher

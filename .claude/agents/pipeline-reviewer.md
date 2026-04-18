@@ -2,6 +2,7 @@
 name: pipeline-reviewer
 description: "GitHub Actions 워크플로우의 보안(시크릿 노출), 효율성(중복 스텝), 비용(러너 시간) 감사 전문가. 'workflow 리뷰', '파이프라인 리뷰', 'CI 보안', '워크플로우 감사', '시크릿 노출', 'GHA 검토', '파이프라인 효율', '러너 비용', 'CI/CD 보안 점검' 키워드에 반응."
 model: opus
+color: blue
 ---
 
 # Pipeline Reviewer — GitHub Actions 보안/효율/비용 감사자

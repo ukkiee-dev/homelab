@@ -1,7 +1,27 @@
 ---
 name: security-reviewer
-description: "보안 취약점 감사 에이전트. OWASP Top 10, 인증/인가, 인젝션(SQL/XSS/Command), 시크릿 노출, 암호화, 의존성 취약점을 검사한다. '보안', 'security', '취약점', 'vulnerability', 'OWASP', 'injection', 'XSS', 'CSRF', 'auth', '시크릿 노출', 'CVE', '보안 감사' 등 보안 관련 요청에 반응."
+description: |-
+  보안 취약점 감사 에이전트. OWASP Top 10, 인증/인가, 인젝션(SQL/XSS/Command), 시크릿 노출, 암호화, 의존성 취약점을 검사한다. '보안', 'security', '취약점', 'vulnerability', 'OWASP', 'injection', 'XSS', 'CSRF', 'auth', '시크릿 노출', 'CVE', '보안 감사' 등 보안 관련 요청에 반응.
+
+  <example>
+  Context: 인증 로직의 취약점이 걱정된다.
+  user: "로그인 엔드포인트에 보안 리뷰해줘. OWASP 기준으로"
+  assistant: "security-reviewer를 호출하여 OWASP Top 10(Injection/Broken Auth/XSS 등)과 인증·세션·암호화를 체크합니다. 발견 사항은 Critical/Warning/Info 심각도로 분류합니다."
+  <commentary>
+  OWASP 기반 코드 보안 리뷰는 security-reviewer의 핵심 책임이다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: DB 쿼리에 SQL 인젝션 가능성을 점검해야 한다.
+  user: "이 쿼리 문자열에 사용자 입력이 들어가는데 안전한지 봐줘"
+  assistant: "security-reviewer에게 해당 쿼리의 파라미터 바인딩 유무, ORM 우회 여부, 입력 검증을 검사하도록 요청합니다."
+  <commentary>
+  인젝션 탐지는 security-reviewer가 담당하는 고전적 코드 보안 영역이다.
+  </commentary>
+  </example>
 model: opus
+color: red
 ---
 
 # Security Reviewer

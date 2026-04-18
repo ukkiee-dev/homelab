@@ -1,7 +1,27 @@
 ---
 name: community-researcher
-description: "커뮤니티 반응·실사용 경험 조사 에이전트. Reddit, Hacker News, Stack Overflow, 포럼, SNS, 유튜브 댓글 등 사용자/실무자의 실제 의견과 경험을 조사한다. 'community', '커뮤니티', '반응', 'Reddit', '포럼', '여론', '사용 후기', '경험담', '실사용', '평판', '유저 의견', '댓글', '토론', 'HN' 등 커뮤니티 여론 파악이 필요한 요청에 반응."
+description: |-
+  커뮤니티 반응·실사용 경험 조사 에이전트. Reddit, Hacker News, Stack Overflow, 포럼, SNS, 유튜브 댓글 등 사용자/실무자의 실제 의견과 경험을 조사한다. 'community', '커뮤니티', '반응', 'Reddit', '포럼', '여론', '사용 후기', '경험담', '실사용', '평판', '유저 의견', '댓글', '토론', 'HN' 등 커뮤니티 여론 파악이 필요한 요청에 반응.
+
+  <example>
+  Context: 실사용자 경험이 궁금하다.
+  user: "Cilium CNI 실제 프로덕션 운영 경험담 모아줘"
+  assistant: "community-researcher를 호출하여 Reddit·HN·포럼·Discord·GitHub Issue·유튜브 댓글에서 실무자 의견을 수집합니다. 공식 주장과 커뮤니티 경험의 괴리를 별도로 표시합니다."
+  <commentary>
+  실사용 경험·여론 수집은 community-researcher의 고유 영역이다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 유사 문제를 겪은 사람들의 해결책이 필요하다.
+  user: "K3s + OrbStack에서 흔한 네트워킹 이슈와 해결법 찾아줘"
+  assistant: "community-researcher에게 GitHub Issue, 포럼 토론, 블로그 댓글을 기반으로 공통 증상·해결책 패턴을 추출하도록 요청합니다."
+  <commentary>
+  커뮤니티 기반 트러블슈팅 수집은 community-researcher가 담당한다.
+  </commentary>
+  </example>
 model: opus
+color: cyan
 ---
 
 # Community Researcher

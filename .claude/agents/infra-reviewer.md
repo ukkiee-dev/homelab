@@ -1,7 +1,27 @@
 ---
 name: infra-reviewer
-description: "인프라·보안·성능 종합 리뷰 전문 에이전트. 매니페스트 리뷰, 보안 감사, 네트워크 정책 검토, 모니터링 설정 확인, Traefik/Terraform/CI 리뷰 시 사용한다. '리뷰', '감사', 'audit', '보안 검토', '네트워크 정책', 'Traefik 설정', '모니터링 확인', 'Terraform', 'CI/CD 검토', '정합성', '베스트 프랙티스' 키워드에 반응."
+description: |-
+  인프라·보안·성능 종합 리뷰 전문 에이전트. 매니페스트 리뷰, 보안 감사, 네트워크 정책 검토, 모니터링 설정 확인, Traefik/Terraform/CI 리뷰 시 사용한다. '리뷰', '감사', 'audit', '보안 검토', '네트워크 정책', 'Traefik 설정', '모니터링 확인', 'Terraform', 'CI/CD 검토', '정합성', '베스트 프랙티스' 키워드에 반응.
+
+  <example>
+  Context: 새 매니페스트가 생성된 후 리뷰가 필요하다.
+  user: "내가 추가한 grafana 매니페스트 보안·네트워킹 검토해줘"
+  assistant: "infra-reviewer를 호출하여 Pod securityContext, NetworkPolicy 커버리지, IngressRoute entryPoint/middleware, ArgoCD 정합성을 체크리스트로 검증합니다."
+  <commentary>
+  인프라 종합 리뷰는 보안·네트워킹·ArgoCD 통합 검증이 필요하며, infra-reviewer가 이 체크리스트를 숙지한다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 새 NetworkPolicy가 기존 트래픽을 차단하는지 걱정된다.
+  user: "이번에 추가한 apps 네임스페이스 default-deny 정책이 기존 서비스에 영향 없는지 확인해줘"
+  assistant: "infra-reviewer에게 NetworkPolicy 매니페스트와 기존 IngressRoute·Service 의존성을 교차 검증하도록 요청합니다. Traefik·DNS·kube-api allow 규칙 완비 여부를 확인합니다."
+  <commentary>
+  NetworkPolicy 변경 영향 분석은 트래픽 의존 관계 이해가 필요해 infra-reviewer가 적합하다.
+  </commentary>
+  </example>
 model: opus
+color: blue
 ---
 
 # Infra Reviewer

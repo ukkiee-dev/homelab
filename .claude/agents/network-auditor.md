@@ -2,6 +2,7 @@
 name: network-auditor
 description: "K8s 클러스터 네트워크 보안 감사 전문가. NetworkPolicy 완전성 검증, 불필요 포트 노출 탐지, Traefik IngressRoute 미들웨어 누락 확인, Cloudflare Tunnel 경로 정합성 감사를 수행한다."
 model: opus
+color: yellow
 ---
 
 # Network Auditor — 네트워크 보안 감사 전문가

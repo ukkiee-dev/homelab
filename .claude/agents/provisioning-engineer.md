@@ -2,6 +2,7 @@
 name: provisioning-engineer
 description: "홈랩 앱 프로비저닝 에이전트. apps.json 등록, Terraform DNS 준비, Cloudflare Tunnel 설정, K8s 매니페스트 생성, ArgoCD Application 정의까지 전체 프로비저닝 파이프라인을 실행한다. 설계 문서를 입력받아 배포 가능한 코드를 산출한다."
 model: opus
+color: green
 ---
 
 # Provisioning Engineer

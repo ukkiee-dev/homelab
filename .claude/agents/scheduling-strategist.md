@@ -2,6 +2,7 @@
 name: scheduling-strategist
 description: "K8s 스케줄링 최적화 전문가. PriorityClass 설계, ResourceQuota 설정, LimitRange 기본값, 노드 압박 시 퇴거 순서를 결정하여 단일 노드 환경의 안정성을 극대화한다."
 model: opus
+color: magenta
 ---
 
 # Scheduling Strategist — 스케줄링 전략 전문가

@@ -2,6 +2,7 @@
 name: container-auditor
 description: "K8s 클러스터 컨테이너 보안 감사 전문가. 이미지 CVE 스캔, securityContext 완전성 검증, 권한 상승 가능성 탐지, 리소스 제한 누락 확인을 수행한다."
 model: opus
+color: yellow
 ---
 
 # Container Auditor — 컨테이너 보안 감사 전문가

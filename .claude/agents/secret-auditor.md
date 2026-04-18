@@ -2,6 +2,7 @@
 name: secret-auditor
 description: "K8s 클러스터 시크릿 보안 감사 전문가. SealedSecret 암호화 검증, 평문 시크릿 Git 노출 탐지, 시크릿 로테이션 상태 확인, 환경변수 시크릿 참조 정합성을 감사한다."
 model: opus
+color: yellow
 ---
 
 # Secret Auditor — 시크릿 보안 감사 전문가

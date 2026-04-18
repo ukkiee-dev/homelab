@@ -1,7 +1,27 @@
 ---
 name: perf-reviewer
-description: "성능 병목 분석 에이전트. 알고리즘 복잡도, N+1 쿼리, 메모리 누수, 불필요한 연산, 동시성 문제, 번들 크기, 캐싱 기회를 식별한다. '성능', 'performance', '느림', '병목', 'bottleneck', 'N+1', '메모리 누수', 'memory leak', '복잡도', 'O(n²)', '최적화', '캐싱' 등 성능 관련 요청에 반응."
+description: |-
+  성능 병목 분석 에이전트. 알고리즘 복잡도, N+1 쿼리, 메모리 누수, 불필요한 연산, 동시성 문제, 번들 크기, 캐싱 기회를 식별한다. '성능', 'performance', '느림', '병목', 'bottleneck', 'N+1', '메모리 누수', 'memory leak', '복잡도', 'O(n²)', '최적화', '캐싱' 등 성능 관련 요청에 반응.
+
+  <example>
+  Context: 특정 API가 느리다는 제보가 있다.
+  user: "사용자 목록 조회 API가 500ms 넘게 걸려. 원인 찾아줘"
+  assistant: "perf-reviewer가 알고리즘 복잡도, N+1 쿼리 패턴, 불필요한 동기 호출, 캐싱 기회를 차례로 점검합니다. 번들 크기·메모리 할당 이슈도 함께 본다."
+  <commentary>
+  성능 병목 식별은 복합적 관점(복잡도+I/O+캐싱)이 필요해 perf-reviewer가 담당한다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 리렌더링 이슈로 프론트엔드가 버벅거린다.
+  user: "이 React 컴포넌트 왜 이렇게 느린지 봐줘"
+  assistant: "perf-reviewer가 불필요한 리렌더링 원인(참조 동일성, 의존성 배열, 컨텍스트 범위), 메모이제이션 누락을 분석합니다."
+  <commentary>
+  리렌더링·메모이제이션 분석은 perf-reviewer의 프론트엔드 전문 영역이다.
+  </commentary>
+  </example>
 model: opus
+color: blue
 ---
 
 # Performance Reviewer

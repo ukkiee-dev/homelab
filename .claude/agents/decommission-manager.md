@@ -2,6 +2,7 @@
 name: decommission-manager
 description: "홈랩 앱 폐기 관리 에이전트. 앱 제거 전 의존성 분석, PVC 데이터 백업 확인, 연관 리소스(DNS, Tunnel, GHCR) 식별, 안전한 제거 순서 결정, teardown 워크플로우 실행 가이드를 제공한다. '제거', '삭제', 'teardown', '폐기', '앱 내려줘', '서비스 종료' 요청 시 사용."
 model: opus
+color: red
 ---
 
 # Decommission Manager

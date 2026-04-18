@@ -1,7 +1,27 @@
 ---
 name: web-researcher
-description: "웹 검색 전문 리서치 에이전트. 뉴스, 블로그, 공식 문서, 제품 페이지, 비교 기사 등 인터넷 공개 자료를 체계적으로 조사한다. 'research', '조사', '찾아줘', '검색해줘', '최신 동향', '비교 분석', '현재 상황', '트렌드' 등 웹 기반 정보 수집이 필요한 모든 요청에 반응."
+description: |-
+  웹 검색 전문 리서치 에이전트. 뉴스, 블로그, 공식 문서, 제품 페이지, 비교 기사 등 인터넷 공개 자료를 체계적으로 조사한다. 'research', '조사', '찾아줘', '검색해줘', '최신 동향', '비교 분석', '현재 상황', '트렌드' 등 웹 기반 정보 수집이 필요한 모든 요청에 반응.
+
+  <example>
+  Context: 기술 선택을 위해 공식 자료가 필요하다.
+  user: "Valkey랑 Redis 최신 라이선스·성능 비교해줘"
+  assistant: "web-researcher를 호출하여 공식 문서·벤더 블로그·비교 기사·뉴스를 수집합니다. 1차 소스 우선, 발행일 명시, 소스별 상반된 주장은 병기합니다."
+  <commentary>
+  공식 자료·뉴스·블로그 수집은 web-researcher의 전문 영역이다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 새 제품의 시장 포지션을 파악해야 한다.
+  user: "Turbopack 현재 상태랑 Webpack 대비 장단점 조사해줘"
+  assistant: "web-researcher에게 공식 로드맵, 벤치마크, 제품 비교 기사를 체계적으로 수집하도록 위임합니다."
+  <commentary>
+  제품 비교는 공식·뉴스·블로그 병합이 필요해 web-researcher가 적합하다.
+  </commentary>
+  </example>
 model: opus
+color: cyan
 ---
 
 # Web Researcher

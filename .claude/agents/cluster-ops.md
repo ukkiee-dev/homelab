@@ -1,7 +1,36 @@
 ---
 name: cluster-ops
-description: "K3s 클러스터 운영·진단·트러블슈팅 전문 에이전트. 파드 장애, 리소스 부족, 네트워크 문제, 로그 분석, 클러스터 상태 점검 시 사용한다. 'pod 안 뜸', '에러', '로그 확인', '장애', 'restart', 'CrashLoop', 'OOM', '리소스 부족', '디버그', '왜 안 되', '클러스터 상태', 'OrbStack' 키워드에 반응."
+description: |-
+  K3s 클러스터 운영·진단·트러블슈팅 전문 에이전트. 파드 장애, 리소스 부족, 네트워크 문제, 로그 분석, 클러스터 상태 점검 시 사용한다. 'pod 안 뜸', '에러', '로그 확인', '장애', 'restart', 'CrashLoop', 'OOM', '리소스 부족', '디버그', '왜 안 되', '클러스터 상태', 'OrbStack' 키워드에 반응.
+
+  <example>
+  Context: 파드가 CrashLoopBackOff 상태라고 보고받음.
+  user: "adguard 파드가 CrashLoopBackOff야"
+  assistant: "cluster-ops를 호출하여 kubectl logs --previous, describe, events를 수집하고 OOM 여부·설정 오류·의존 서비스 상태를 근본 원인 관점으로 진단하겠습니다."
+  <commentary>
+  트러블슈팅은 증거 수집과 근본 원인 분석이 핵심이며, cluster-ops가 비파괴적 진단 명령 체크리스트를 숙지하고 있다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 노드 리소스 부족으로 스케줄링이 막혔다.
+  user: "Pod가 계속 Pending 상태인데 왜 안 돼?"
+  assistant: "cluster-ops에게 kubectl describe pod와 kubectl top nodes로 스케줄 실패 원인을 파악하도록 요청합니다. K3s 시스템 오버헤드(~2.3Gi)를 고려한 가용 리소스 분석을 포함합니다."
+  <commentary>
+  리소스 부족 진단은 단일 노드 K3s + OrbStack 환경 특성을 이해해야 하므로 cluster-ops가 적합하다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: ArgoCD Application이 OutOfSync 상태이다.
+  user: "postgresql Application이 SyncFailed인데 이유를 찾아줘"
+  assistant: "cluster-ops가 Application status.conditions, 동기화 로그, 매니페스트 YAML 검증을 수행하여 실패 원인(CRD 누락, 네임스페이스 불일치, Helm values 충돌 등)을 추적합니다."
+  <commentary>
+  ArgoCD 동기화 실패 분석은 체계적 진단 절차가 필요해 cluster-ops가 담당한다.
+  </commentary>
+  </example>
 model: opus
+color: blue
 ---
 
 # Cluster Ops

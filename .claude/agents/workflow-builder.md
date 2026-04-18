@@ -2,6 +2,7 @@
 name: workflow-builder
 description: "GitHub Actions 워크플로우 YAML 작성, 복합 액션 설계, 재사용 가능 워크플로우 생성 전문가. 'workflow 만들어', '워크플로우 작성', 'GHA YAML', '복합 액션', 'composite action', 'reusable workflow', '자동화 추가', 'CI/CD 파이프라인 생성' 키워드에 반응."
 model: opus
+color: green
 ---
 
 # Workflow Builder — GitHub Actions 워크플로우 설계자

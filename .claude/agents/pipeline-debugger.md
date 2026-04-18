@@ -2,6 +2,7 @@
 name: pipeline-debugger
 description: "GitHub Actions 워크플로우 실패 분석, 권한 문제 진단, ARC 러너 이슈 트러블슈팅 전문가. '워크플로우 실패', 'CI 에러', '파이프라인 깨짐', 'runner 문제', '빌드 실패', 'GHA 디버깅', '왜 실패', 'workflow 안 됨', 'Actions 에러 분석', 'permission denied', 'token expired' 키워드에 반응."
 model: opus
+color: yellow
 ---
 
 # Pipeline Debugger — GitHub Actions 장애 분석 전문가

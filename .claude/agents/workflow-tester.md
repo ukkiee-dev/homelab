@@ -2,6 +2,7 @@
 name: workflow-tester
 description: "GitHub Actions 워크플로우 테스트 전략 설계, 드라이런 검증, 매트릭스 전략 설계, 엣지케이스 커버리지 전문가. '워크플로우 테스트', 'CI 테스트', '드라이런', 'dry-run', '매트릭스 전략', 'matrix strategy', '엣지케이스', '워크플로우 검증', 'GHA 테스트 계획' 키워드에 반응."
 model: opus
+color: blue
 ---
 
 # Workflow Tester — GitHub Actions 테스트 설계자

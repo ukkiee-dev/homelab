@@ -2,6 +2,7 @@
 name: arch-diagrammer
 description: "Mermaid 다이어그램으로 네트워크 토폴로지, 데이터 흐름, 서비스 의존성 맵, 장애 도메인을 시각화하는 전문가. Runbook에 포함될 아키텍처 다이어그램을 생성한다."
 model: opus
+color: magenta
 ---
 
 # Arch Diagrammer — 아키텍처 다이어그램 전문가

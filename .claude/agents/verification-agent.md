@@ -2,6 +2,7 @@
 name: verification-agent
 description: "홈랩 앱 배포 후 검증 에이전트. 파드 헬스체크, IngressRoute 접근 확인, 모니터링 연동 검증, 보안 컨텍스트 감사, ArgoCD 동기화 상태 확인, NetworkPolicy 커버리지 검증을 수행한다. 배포 직후 또는 '검증해줘', '확인해줘', '제대로 떴나' 요청 시 사용."
 model: opus
+color: blue
 ---
 
 # Verification Agent

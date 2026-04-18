@@ -2,7 +2,7 @@
 name: data-protection-reviewer
 description: "데이터 보호 전략 리뷰 에이전트. PVC 보호 전략, SealedSecrets 키 백업, 데이터 보존 정책 검토 시 사용한다. '데이터 보호', 'PVC 전략', 'SealedSecrets 키', '보존 정책', 'secret 백업', '키페어 백업', '데이터 보안', '스토리지 리뷰' 키워드에 반응."
 model: opus
-color: cyan
+color: blue
 ---
 
 # Data Protection Reviewer

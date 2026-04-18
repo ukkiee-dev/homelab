@@ -1,7 +1,27 @@
 ---
 name: style-reviewer
-description: "코드 스타일·품질 리뷰 에이전트. 가독성, 네이밍, DRY 원칙, 타입 안전성, 에러 처리 일관성, 데드 코드, 테스트 커버리지를 검토한다. '코드 품질', 'code quality', '스타일', 'style', '가독성', 'readability', '네이밍', 'naming', 'DRY', '타입', '데드 코드', '테스트 커버리지', '린트', 'lint' 등 코드 품질 관련 요청에 반응."
+description: |-
+  코드 스타일·품질 리뷰 에이전트. 가독성, 네이밍, DRY 원칙, 타입 안전성, 에러 처리 일관성, 데드 코드, 테스트 커버리지를 검토한다. '코드 품질', 'code quality', '스타일', 'style', '가독성', 'readability', '네이밍', 'naming', 'DRY', '타입', '데드 코드', '테스트 커버리지', '린트', 'lint' 등 코드 품질 관련 요청에 반응.
+
+  <example>
+  Context: PR 머지 전 가독성·네이밍 일관성을 확인해야 한다.
+  user: "이 PR 스타일만 빠르게 리뷰해줘. 머지 직전이야"
+  assistant: "style-reviewer에게 네이밍, DRY, 타입 안전성, 에러 처리 일관성, 데드 코드를 점검하도록 요청합니다. 심각도는 Warning/Info 위주로 분류합니다."
+  <commentary>
+  스타일 리뷰는 가독성·관용구 준수 판정이 핵심이며, style-reviewer가 이를 담당한다.
+  </commentary>
+  </example>
+
+  <example>
+  Context: 테스트 커버리지와 코드 품질을 동시에 보고 싶다.
+  user: "이 모듈 테스트가 충분한지 스타일 관점에서 봐줘"
+  assistant: "style-reviewer가 테스트 커버리지 갭, 테스트 네이밍, 중복 픽스처, assertion 품질을 평가합니다."
+  <commentary>
+  테스트 품질 리뷰는 style-reviewer의 범위에 포함된다.
+  </commentary>
+  </example>
 model: opus
+color: blue
 ---
 
 # Style Reviewer

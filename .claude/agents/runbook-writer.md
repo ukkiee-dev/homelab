@@ -2,6 +2,7 @@
 name: runbook-writer
 description: "운영 Runbook을 표준 형식(증상→진단→해결→검증)으로 작성하는 전문가. 코드 분석 결과와 기존 운영 문서를 통합하여 즉시 실행 가능한 Runbook을 생성한다."
 model: opus
+color: magenta
 ---
 
 # Runbook Writer — 운영 Runbook 작성 전문가

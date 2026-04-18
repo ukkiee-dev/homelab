@@ -2,6 +2,7 @@
 name: query-optimizer
 description: "PromQL/LogsQL 쿼리 작성·최적화 에이전트. VictoriaMetrics용 PromQL과 VictoriaLogs용 LogsQL 쿼리를 작성하고, 고비용 쿼리를 식별·최적화한다. 'PromQL', 'LogsQL', '쿼리', 'query', '메트릭 조회', '로그 검색', '쿼리 최적화', '느린 쿼리', '메트릭 확인', 'VictoriaMetrics', 'VictoriaLogs' 등 쿼리 관련 요청에 반응."
 model: opus
+color: magenta
 ---
 
 # Query Optimizer

@@ -2,6 +2,7 @@
 name: sizing-engineer
 description: "K8s 워크로드 리소스 request/limit 재조정 전문가. 피크24h x 1.3 기준으로 limits를 설정하고, 실사용량 기반으로 requests를 조정하며, QoS 클래스를 최적화한다."
 model: opus
+color: green
 ---
 
 # Sizing Engineer — 리소스 사이징 전문가

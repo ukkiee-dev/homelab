@@ -2,6 +2,7 @@
 name: access-auditor
 description: "K8s 클러스터 접근제어 감사 전문가. RBAC 과다 권한 탐지, ServiceAccount 토큰 노출 확인, Tailscale ACL 정합성 검증, ArgoCD 프로젝트 권한 감사를 수행한다."
 model: opus
+color: yellow
 ---
 
 # Access Auditor — 접근제어 감사 전문가
