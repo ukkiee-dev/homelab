@@ -21,20 +21,35 @@ spec:
     server: https://kubernetes.default.svc
     namespace: pokopia-wiki
   # v0.4 리뷰 P7 활성화 (2026-04-21 Phase 6 drift 관찰 후):
-  # CNPG operator 가 SSA 로 Cluster spec 에 default 값 자동 채움 — affinity, bootstrap.initdb,
-  # enablePDB, enableSuperuserAccess, failoverDelay, logLevel, managed.roles[].connectionLimit/inherit,
-  # maxSyncReplicas/minSyncReplicas, monitoring.customQueriesConfigMap/disableDefaultQueries,
-  # plugins[].enabled 등.
+  # CNPG operator 가 Cluster spec 에 default 값 자동 채움.
   #
-  # 개별 경로 나열 대신 managedFieldsManagers 로 operator SSA 관리 필드 전체 제외.
-  # 메모리 `project_traefik_helm_v39_gomemlimit_ssa` 정신과 일관 (SSA ownership 충돌 회피).
+  # managedFieldsManagers 시도했으나 kubectl get cluster 의 metadata.managedFields 가 null →
+  # SSA manager 이름 기반 필터 무효. jsonPointers/jqPathExpressions 로 개별 경로 명시.
+  #
+  # 메모리 `project_traefik_helm_v39_gomemlimit_ssa` 패턴 연장 — operator 자동 주입 필드 명시적 무시.
   ignoreDifferences:
     - group: postgresql.cnpg.io
       kind: Cluster
       name: pokopia-wiki-pg
       namespace: pokopia-wiki
-      managedFieldsManagers:
-        - cloudnative-pg
+      jsonPointers:
+        - /spec/affinity
+        - /spec/bootstrap
+        - /spec/enablePDB
+        - /spec/enableSuperuserAccess
+        - /spec/failoverDelay
+        - /spec/logLevel
+        - /spec/maxSyncReplicas
+        - /spec/minSyncReplicas
+      jqPathExpressions:
+        # CNPG 가 managed.roles 에 connectionLimit=-1, inherit=true 자동 추가
+        - '.spec.managed.roles[].connectionLimit'
+        - '.spec.managed.roles[].inherit'
+        # monitoring 블록에 default queries configmap · disableDefaultQueries=false 자동 추가
+        - '.spec.monitoring.customQueriesConfigMap'
+        - '.spec.monitoring.disableDefaultQueries'
+        # plugins[].enabled=true 자동 추가
+        - '.spec.plugins[].enabled'
   syncPolicy:
     automated:
       selfHeal: true
