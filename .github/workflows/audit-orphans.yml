@@ -72,12 +72,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          # apps.json + infra-hostnames.json에서 expected hostnames 추출
-          # infra-hostnames.json: ArgoCD 등 앱 레포가 없는 infra 도메인 레지스트리
-          EXPECTED=$( {
-            jq -r 'to_entries[] | "\(.value.subdomain).'"${DOMAIN}"'"' terraform/apps.json
-            jq -r 'to_entries[] | "\(.value.subdomain).'"${DOMAIN}"'"' terraform/infra-hostnames.json
-          } | sort -u)
+          # apps.json 에서만 expected hostnames 추출 (Tunnel 경유 앱 기준).
+          # infra-hostnames.json 은 Tunnel 미경유 (예: A record + Tailscale IP) 도메인
+          # 관리용이므로 여기서 병합하지 않는다 — Tunnel 정합성 감사와 무관.
+          EXPECTED=$(jq -r 'to_entries[] | "\(.value.subdomain).'"${DOMAIN}"'"' terraform/apps.json | sort)
 
           # Tunnel API에서 현재 hostnames 추출
           ACTUAL=$(bash .github/scripts/manage-tunnel-ingress.sh list | sort)

@@ -1,6 +1,9 @@
 {
   "argo": {
     "subdomain": "argo",
-    "description": "ArgoCD UI — IngressRoute in manifests/infra/argocd/"
+    "type": "A",
+    "content": "100.112.20.3",
+    "proxied": false,
+    "description": "ArgoCD UI — Tailscale IP 직접 공개(Tunnel 미경유), IngressRoute 의 tailscale-only middleware 로 접근 제한"
   }
 }

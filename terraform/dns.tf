@@ -19,8 +19,8 @@ resource "cloudflare_dns_record" "infra" {
 
   zone_id = var.zone_id
   name    = each.value.subdomain
-  content = "${var.tunnel_id}.cfargotunnel.com"
-  type    = "CNAME"
-  proxied = true
+  type    = each.value.type
+  content = each.value.content
+  proxied = each.value.proxied
   ttl     = 1
 }
