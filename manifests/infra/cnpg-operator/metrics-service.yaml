@@ -1,0 +1,33 @@
+# Phase 5 Task 5.1.1 (리뷰 C3 반영): CNPG operator 가 자체 메트릭용 Service 를 자동 생성하지 않음.
+# Phase 0 Task 0.2 Step 3 (`_workspace/cnpg-migration/00_versions.md` §4.1) 에서 `monitoring.service` 키 부재 확인.
+# 메모리 `project_argocd_metrics_service_gap` 동일 패턴 → Kustomize overlay 로 수동 추가.
+#
+# VM scrape annotation 부여 → kubernetes-service-endpoints job 이 auto-discovery.
+# operator 는 :8080 에 controller-runtime + workqueue 메트릭 노출 (controller_runtime_reconcile_total 등).
+apiVersion: v1
+kind: Service
+metadata:
+  name: cnpg-controller-manager-metrics
+  namespace: cnpg-system
+  annotations:
+    # VM scrape-config.yaml 의 kubernetes-service-endpoints job 이 annotation 기반 auto-discovery
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/component: manager-metrics
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  type: ClusterIP
+  selector:
+    # chart 의 operator Deployment selector 와 일치 (실측: Deployment cnpg-cloudnative-pg)
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics     # containerPort name (helm template 실측)
+      protocol: TCP

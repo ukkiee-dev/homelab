@@ -1614,3 +1614,217 @@ data:
               summary: "Traefik config/router 빌드 에러 로그 5분간 {{ $value }}건 — reload 실패 가능"
               dashboardUid: "infra-alerts-overview"
               panelId: "1"
+
+      - orgId: 1
+        name: cnpg-alerts
+        folder: Infra
+        interval: 1m
+        # Phase 5 Task 5.4: CloudNativePG 4종 알람.
+        # Phase 3 Task 3.8 `_workspace/cnpg-migration/10_cnpg-metrics.txt` 에서 메트릭 실존 검증 완료.
+        # 리뷰 M8: cnpg_collector_pg_wal_archive_status 의 라벨 키 `value` 확인.
+        # 리뷰 H5: CNPGPVCDiskPressure 는 cnpg.io/cluster 라벨 기반 (정규식 대신).
+        rules:
+          - uid: cnpg-collector-down
+            title: CNPG exporter down
+            # cnpg_collector_up == 1 정상. 0 이면 exporter 장애 또는 pod not ready.
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: cnpg_collector_up
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: lt
+                        params:
+                          - 1
+                  refId: C
+            noDataState: Alerting
+            execErrState: Error
+            for: 5m
+            labels:
+              severity: critical
+              category: database
+            annotations:
+              summary: "CNPG exporter down — {{ $labels.cluster }} ({{ $labels.namespace }}): value={{ $value }}"
+              description: "cnpg_collector_up 이 5분간 1 이 아님. pod 상태·NetworkPolicy·scrape 경로 점검."
+              dashboardUid: "cnpg-cluster"
+
+          - uid: cnpg-backup-too-old
+            title: CNPG backup 오래됨
+            # time() - last_available_backup_timestamp > 30h (108000s).
+            # ScheduledBackup daily UTC 18:00 주기 기준 30h 이면 하루 이상 skip.
+            # 주의: recovery 모드 Cluster (spec.plugins 제외) 는 값 0 → 즉시 발화 (false positive).
+            #       Phase 6 실 프로젝트 전환 시 정상화. pg-trial PoC 기간 동안 예상된 false positive.
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: time() - cnpg_collector_last_available_backup_timestamp
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 108000
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 10m
+            labels:
+              severity: warning
+              category: database
+            annotations:
+              summary: "CNPG backup 오래됨 — {{ $labels.cluster }}: {{ humanizeDuration $value }} 경과"
+              description: "마지막 성공 backup 이 30시간 이상. ScheduledBackup·ObjectStore·plugin pod 점검."
+              dashboardUid: "cnpg-cluster"
+
+          - uid: cnpg-wal-archive-stuck
+            title: CNPG WAL archive 정체
+            # value="ready" 는 archive 대기 중인 WAL 세그먼트 수. 10 초과 시 archive 경로 문제.
+            # 리뷰 M8 검증: value="ready" 라벨 키 Phase 3 Task 3.8 에서 plan 과 일치 확인.
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: cnpg_collector_pg_wal_archive_status{value="ready"}
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 10
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 15m
+            labels:
+              severity: warning
+              category: database
+            annotations:
+              summary: "CNPG WAL archive 정체 — {{ $labels.cluster }}: ready 세그먼트 {{ $value }}개"
+              description: "archive_command 실패 의심. R2 credential·network·plugin gRPC 점검."
+              dashboardUid: "cnpg-cluster"
+
+          - uid: cnpg-pvc-disk-pressure
+            title: CNPG PVC 디스크 사용률 임계
+            # 리뷰 H5: cnpg.io/cluster 라벨 기반 (정규식 대신). kube_persistentvolumeclaim_labels 에
+            # label_cnpg_io_cluster 가 있을 때만 매칭. kube-state-metrics 전제.
+            # walStorage 분리 (향후 <cluster>-wal-N 패턴) 도입 시에도 자동 커버.
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: victoriametrics
+                model:
+                  expr: |
+                    (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes)
+                    and on (namespace, persistentvolumeclaim)
+                    kube_persistentvolumeclaim_labels{label_cnpg_io_cluster!=""}
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 900
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0.8
+                  refId: C
+            noDataState: OK
+            execErrState: Error
+            for: 15m
+            labels:
+              severity: warning
+              category: database
+            annotations:
+              summary: "CNPG PVC 디스크 80% 초과 — {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} ({{ humanizePercentage $value }})"
+              description: "local-path resize 미지원. backup → bootstrap.recovery 절차 또는 .app-config.yml database.storage 상향 필요."
+              dashboardUid: "cnpg-cluster"
