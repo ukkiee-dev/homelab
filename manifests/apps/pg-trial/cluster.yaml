@@ -56,3 +56,12 @@ spec:
         login: true
         passwordSecret:
           name: pg-trial-pg-demo-credentials
+
+  # Phase 4: barman-cloud plugin 연결. Plugin 이 WAL archive 및 base backup 담당.
+  # ObjectStore CR `pg-trial-backup` 의 설정에 따라 R2 로 업로드.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: pg-trial-backup
+        serverName: pg-trial-pg
