@@ -113,8 +113,8 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Config Reload Success",
-      "description": "1 = last config reload succeeded, 0 = failed. Sourced from traefik_config_last_reload_success.",
+      "title": "Seconds Since Last Reload",
+      "description": "Seconds since last successful config reload. traefik_config_last_reload_success is a Unix timestamp gauge (v2.x 부터 v3.x 일관). Green < 1h, Yellow 1h~24h, Red > 24h (heartbeat 이상 신호).",
       "datasource": {
         "type": "prometheus",
         "uid": "victoriametrics"
@@ -123,8 +123,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(traefik_config_last_reload_success{job=\"kubernetes-pods\"})",
-          "legendFormat": "reload",
+          "expr": "time() - max(traefik_config_last_reload_success{job=\"kubernetes-pods\",app_kubernetes_io_name=\"traefik\"})",
+          "legendFormat": "since last reload",
           "datasource": {"type": "prometheus", "uid": "victoriametrics"}
         }
       ],
@@ -143,15 +143,13 @@
       "fieldConfig": {
         "defaults": {
           "color": {"mode": "thresholds"},
-          "unit": "none",
-          "mappings": [
-            {"type": "value", "options": {"0": {"text": "FAIL", "color": "red"}, "1": {"text": "OK", "color": "green"}}}
-          ],
+          "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "green", "value": 1}
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 3600},
+              {"color": "red", "value": 86400}
             ]
           }
         },
