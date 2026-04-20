@@ -28,6 +28,17 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: traefik-system
+  # chart 37.0.0 PR #1418 이후 GOMEMLIMIT env 가 렌더링 시점 value 로 주입되면서
+  # K8s Deployment controller SSA field ownership 과 충돌하여 drift 가 반복된다
+  # (traefik-helm-chart Issue #1065 패턴). 홈랩 메모리 `project_traefik_helm_v39_gomemlimit_ssa`
+  # 참조. 해당 필드의 drift 를 ArgoCD 동기화 대상에서 제외하여 반복 OOS 를 예방.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: traefik
+      namespace: traefik-system
+      jqPathExpressions:
+        - '.spec.template.spec.containers[] | select(.name=="traefik") | .env[] | select(.name=="GOMEMLIMIT")'
   syncPolicy:
     automated:
       selfHeal: true
@@ -41,3 +52,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
