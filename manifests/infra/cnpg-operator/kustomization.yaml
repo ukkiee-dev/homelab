@@ -11,4 +11,5 @@ namespace: cnpg-system
 # Phase 5 Task 5.1.1 에서 metrics-service.yaml 을 이 resources 에 추가 예정.
 resources:
   - namespace.yaml
-  # Phase 5 예정: metrics-service.yaml
+  # Phase 5 Task 5.1.1 (리뷰 C3): chart 가 operator 메트릭 Service 자동 생성 안 함 → 수동 추가
+  - metrics-service.yaml

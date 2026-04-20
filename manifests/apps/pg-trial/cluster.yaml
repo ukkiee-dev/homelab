@@ -57,11 +57,16 @@ spec:
         passwordSecret:
           name: pg-trial-pg-demo-credentials
 
-  # Phase 4: barman-cloud plugin 연결. Plugin 이 WAL archive 및 base backup 담당.
-  # ObjectStore CR `pg-trial-backup` 의 설정에 따라 R2 로 업로드.
-  plugins:
-    - name: barman-cloud.cloudnative-pg.io
-      isWALArchiver: true
-      parameters:
-        barmanObjectName: pg-trial-backup
-        serverName: pg-trial-pg
+  # Phase 4 Task 4.6a PITR 드라이런 이후 recovery 모드 상태 유지 (runtime drift 해소).
+  # 동일 serverName=pg-trial-pg 로 archive 재개 시도 시 barman-cloud-check-wal-archive 가
+  # "Expected empty archive" 에러 반환 (docs/runbooks/postgresql/cnpg-pitr-restore.md 의
+  # "알려진 이슈" 섹션 참고). PoC Cluster 이므로 plugins 블록 제외 유지 — WAL archive 안 함.
+  #
+  # Phase 6 에서 실 프로젝트로 전환 시 새 Cluster + 새 serverName + spec.plugins 포함.
+  # pg-trial 은 Phase 6 이후 teardown 예정.
+  # plugins:
+  #   - name: barman-cloud.cloudnative-pg.io
+  #     isWALArchiver: true
+  #     parameters:
+  #       barmanObjectName: pg-trial-backup
+  #       serverName: pg-trial-pg-v2   # 재활성화 시 serverName 증분 필수

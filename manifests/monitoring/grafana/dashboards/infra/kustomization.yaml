@@ -13,5 +13,6 @@ configMapGenerator:
   - name: grafana-dashboards-infra
     files:
       - alerts-overview.json
+      - cnpg-cluster.json
       - coredns.json
       - traefik.json
