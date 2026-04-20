@@ -24,6 +24,10 @@ inputs:
   github-token:
     description: "GHCR push용 토큰. 일반적으로 secrets.GITHUB_TOKEN 전달."
     required: true
+  build-args:
+    description: "docker build --build-arg 리스트 (멀티라인 KEY=VALUE). SPA 빌드 타임 env 주입 등."
+    required: false
+    default: ""
 
 outputs:
   image:
@@ -111,6 +115,7 @@ runs:
         context: ${{ steps.meta.outputs.context }}
         file: ${{ steps.meta.outputs.dockerfile }}
         platforms: ${{ inputs.platforms }}
+        build-args: ${{ inputs.build-args }}
         push: true
         tags: |
           ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
