@@ -143,14 +143,63 @@ kubectl -n "$NS" run verify --rm -it --restart=Never --image=postgres:16-alpine 
 - [ ] 이 Runbook 부록에 실행 기록 (날짜, TARGET_TIME, 소요 시간, 복구 데이터 건수)
 - [ ] 복구 원인 (데이터 손상 원인) 별도 incident report
 
-## Phase 4 드라이런 실측값 (Phase 9 에서 채움)
+## Phase 4 드라이런 실측값 (2026-04-21)
 
 | 항목 | 값 |
 |---|---|
-| Step 2 cluster delete 소요 | <TBD min> |
-| Step 3 recovery 완료 소요 | <TBD min> (base <X>MB + WAL <Y>개) |
-| 전체 복구 시간 RTO | <TBD min> |
-| RPO (마지막 WAL archive 기준) | <TBD min> |
+| Step 2 cluster delete + PVC 정리 | ~15초 |
+| Step 3 recovery job 완료 (full-recovery pod) | ~44초 |
+| Step 3 primary pod Ready 까지 | ~2분 (base 5.2MB + WAL 4 segments) |
+| 전체 복구 시간 RTO | **약 3분** (홈랩 소규모 DB 기준) |
+| RPO | **≤ WAL archive 주기** (5분 기본, `pg_switch_wal()` 강제 시 즉시) |
+
+## ⚠️ 알려진 이슈: barman-cloud-check-wal-archive "Expected empty archive"
+
+**증상**: recovery Cluster 에 기존 cluster 와 **동일한 `spec.plugins[].parameters.serverName`** 및 `barmanObjectName` 사용 시:
+
+```
+ERROR: WAL archive check failed for server <serverName>: Expected empty archive
+```
+
+**원인**: plugin-barman-cloud v0.12 는 new Cluster bootstrap 시 archive destination 이 empty 여야 함을 검증 (timeline 충돌 방지). 같은 serverName 재사용 시 기존 archive 감지 → 거부.
+
+**해결 3 옵션**:
+
+1. **recovery 전용 모드 (PoC 용)** — `spec.plugins` 블록 **제외**. WAL archive 안 하고 read-only 복구만. 복구 후 cleanup 으로 마무리. Phase 4 Task 4.6a 에서 이 방식 적용.
+
+2. **serverName 증분 (실 운영 권장)** — recovery Cluster 의 `spec.plugins[0].parameters.serverName` 을 **새 값** (예: `<cluster>-v2`) 으로 지정. `externalClusters[].plugin.parameters.serverName` 은 원본 값 유지 (복구 source). R2 prefix 는 `<cluster>-v2/{base,wals}/` 로 신규 분기.
+
+3. **새 ObjectStore + destinationPath** — `pg-<project>-backup-v2` ObjectStore 생성, 다른 path (`s3://homelab-db-backups/<project>-v2`). recovery Cluster 의 `spec.plugins[0].parameters.barmanObjectName` 을 v2 로 교체.
+
+실 프로젝트 운영 시: **옵션 2 (serverName 증분)** 를 Runbook 표준으로 채택. Step 3 YAML 예시 에 `serverName: <cluster>-v<N>` 주석 필수.
+
+## Step 3 YAML 수정 안내 (실 프로젝트 PITR)
+
+원본 Step 3 예시 에서 아래 두 줄 추가:
+
+```yaml
+spec:
+  # ... 기존 ...
+  bootstrap:
+    recovery:
+      source: <cluster>-backup-source
+      recoveryTarget:
+        targetTime: "<TARGET_TIME UTC>"
+  externalClusters:
+    - name: <cluster>-backup-source
+      plugin:
+        parameters:
+          barmanObjectName: <cluster>-backup
+          serverName: <cluster>             # 원본 archive 참조 (읽기)
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: <cluster>-backup  # 동일 ObjectStore 재사용
+        serverName: <cluster>-v2            # 🔑 새 serverName (archive 충돌 방지)
+```
+
+복구 완료 + PR ③ 이후에도 serverName=`<cluster>-v2` 유지. 다음 PITR 필요 시 `-v3`, `-v4` 증분.
 
 ## 참고
 
