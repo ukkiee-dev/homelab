@@ -54,6 +54,33 @@
       "description": "Group monitoring updates",
       "matchPackagePatterns": ["prometheus", "grafana", "loki", "promtail", "alertmanager", "restic", "victoriametrics", "kube-state-metrics"],
       "groupName": "monitoring"
+    },
+    {
+      "description": "CNPG stack - operator + cert-manager 수동 리뷰 (design v0.4 H6 반영: auto-merge 금지)",
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["cloudnative-pg", "cert-manager"],
+      "major": { "enabled": false },
+      "minor": { "automerge": false },
+      "patch": { "automerge": false },
+      "groupName": "cnpg-stack",
+      "labels": ["dependencies", "cnpg"]
+    },
+    {
+      "description": "CNPG postgres image - minor auto-merge, major 차단 (pg_upgrade 필요)",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/cloudnative-pg/postgresql"],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)-(?<type>\\w+)-(?<os>\\w+)$",
+      "major": { "enabled": false },
+      "minor": { "automerge": true },
+      "groupName": "cnpg-postgres-image"
+    },
+    {
+      "description": "plugin-barman-cloud - GitHub release (수동 리뷰)",
+      "matchDatasources": ["github-releases"],
+      "matchPackageNames": ["cloudnative-pg/plugin-barman-cloud"],
+      "automerge": false,
+      "groupName": "cnpg-barman-plugin",
+      "labels": ["dependencies", "cnpg"]
     }
   ],
   "labels": ["dependencies"],
