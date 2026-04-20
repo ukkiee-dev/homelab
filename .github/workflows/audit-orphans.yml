@@ -72,8 +72,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # apps.json에서 expected hostnames 추출
-          EXPECTED=$(jq -r 'to_entries[] | "\(.value.subdomain).'"${DOMAIN}"'"' terraform/apps.json | sort)
+          # apps.json + infra-hostnames.json에서 expected hostnames 추출
+          # infra-hostnames.json: ArgoCD 등 앱 레포가 없는 infra 도메인 레지스트리
+          EXPECTED=$( {
+            jq -r 'to_entries[] | "\(.value.subdomain).'"${DOMAIN}"'"' terraform/apps.json
+            jq -r 'to_entries[] | "\(.value.subdomain).'"${DOMAIN}"'"' terraform/infra-hostnames.json
+          } | sort -u)
 
           # Tunnel API에서 현재 hostnames 추출
           ACTUAL=$(bash .github/scripts/manage-tunnel-ingress.sh list | sort)
@@ -107,21 +111,24 @@ jobs:
           DNS_ONLY: ${{ steps.drift.outputs.dns_only }}
           TUNNEL_ONLY: ${{ steps.drift.outputs.tunnel_only }}
         run: |
-          MSG="주간 감사 결과%0A"
+          # C-style $'...' 로 실제 \n 문자열 구성 → curl --data-urlencode 가 안전하게 인코딩.
+          # 기존 %0A 리터럴 + -d 방식은 MSG 내 &/=/+ 같은 문자에 취약해 잘림 유발 가능.
+          MSG=$'주간 감사 결과\n'
 
           if [ "$ORPHAN_FOUND" = "true" ]; then
-            MSG="${MSG}%0A고아 앱: ${ORPHAN_LIST}%0A정리: gh workflow run teardown.yml -f app-name=<이름>"
+            MSG+=$'\n고아 앱: '"${ORPHAN_LIST}"$'\n정리: gh workflow run teardown.yml -f app-name=<이름>'
           fi
 
           if [ "$DRIFT_FOUND" = "true" ]; then
-            MSG="${MSG}%0A%0ATunnel drift:"
-            [ -n "$DNS_ONLY" ] && MSG="${MSG}%0ADNS에만: ${DNS_ONLY}"
-            [ -n "$TUNNEL_ONLY" ] && MSG="${MSG}%0ATunnel에만: ${TUNNEL_ONLY}"
+            MSG+=$'\n\nTunnel drift:'
+            [ -n "$DNS_ONLY" ]    && MSG+=$'\nDNS에만: '"${DNS_ONLY}"
+            [ -n "$TUNNEL_ONLY" ] && MSG+=$'\nTunnel에만: '"${TUNNEL_ONLY}"
+            MSG+=$'\n조치: terraform/apps.json 또는 terraform/infra-hostnames.json 누락 여부 먼저 확인'
           fi
 
-          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            -d chat_id="${TG_CHAT}" \
-            -d text="$MSG"
+          curl -sS --fail -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}"
 
       - name: Notify workflow failure
         if: failure()

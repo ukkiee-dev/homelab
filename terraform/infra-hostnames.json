@@ -1,0 +1,6 @@
+{
+  "argo": {
+    "subdomain": "argo",
+    "description": "ArgoCD UI — IngressRoute in manifests/infra/argocd/"
+  }
+}
