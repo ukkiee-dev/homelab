@@ -1,0 +1,31 @@
+# CloudNativePG operator chart 0.28.0 (app v1.29.0) Helm values
+#
+# Phase 0 Task 0.2 버전 pin (`_workspace/cnpg-migration/00_versions.md`) 반영.
+# 주요 default 는 chart 가 이미 홈랩 요구와 일치 — 최소 override 만 수행:
+#   - monitoring.podMonitorEnabled: false  (chart default, 홈랩 VM auto-discovery 전제)
+#   - monitoring.grafanaDashboard.create: false  (Phase 5 에서 별도 ConfigMap 로 import)
+#   - crds.create: true  (chart default, CRD 8종 자동 설치)
+#   - config.clusterWide: true  (chart default, 모든 namespace 의 Cluster CR 감시)
+#
+# Phase 0 Task 0.2 Step 3 발견: chart 가 `monitoring.service` 키 부재
+#   → operator 메트릭용 Service 자동 생성 안 됨. Phase 5 Task 5.1.1 에서
+#   `manifests/infra/cnpg-operator/metrics-service.yaml` 수동 추가 예정.
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 100Mi
+  limits:
+    cpu: 500m
+    memory: 400Mi
+
+# monitoring (홈랩은 VM auto-discovery 로 scrape — PodMonitor 불필요)
+monitoring:
+  podMonitorEnabled: false
+  grafanaDashboard:
+    create: false
+
+# log 포맷
+logLevel: info
