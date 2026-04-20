@@ -1,0 +1,283 @@
+name: Setup CNPG Database for App
+description: |
+  `.app-config.yml` 의 `database` 블록 기반으로 CNPG 매니페스트를 생성.
+  템플릿(`.github/templates/cnpg/`) 을 sed 로 placeholder 치환 후 `manifests/apps/<app>/common/` 에 배치.
+  role password 는 openssl 로 생성 → kubeseal 로 SealedSecret seal.
+
+  시나리오:
+    - mode=owner     : managed.roles + role SealedSecret + Database CR 생성 (services/<svc>/database.yaml 또는 common/database-shared.yaml)
+    - mode=reference : Database CR 생성 안 함, env 는 owner 의 credentials 공유 (setup-app 상위 step 이 처리)
+    - mode=none      : DB 관련 매니페스트 생성 안 함
+
+  Phase 7 초기 버전. 이번 composite 은 매니페스트 생성 뼈대만 담당. end-to-end 테스트는
+  `_create-app.yml` 통합 PR 이후 별도 검증.
+
+inputs:
+  app-name:
+    description: "프로젝트 이름 (namespace 및 Cluster prefix)"
+    required: true
+  service-name:
+    description: "모노레포 서비스 이름. mode=reference-readonly 향후 도입 시 사용"
+    required: false
+    default: ""
+  mode:
+    description: "owner | reference | none"
+    required: true
+    default: "none"
+  db-name:
+    description: "Database 이름 (owner 모드 필수)"
+    required: false
+    default: ""
+  ref-db:
+    description: "참조 대상 owner 서비스 이름 (reference 모드 전용)"
+    required: false
+    default: ""
+  role-name:
+    description: "role 이름. 비어있으면 mode=owner 시 service-name 또는 app-name 기반 기본값"
+    required: false
+    default: ""
+  pg-image-tag:
+    description: "CNPG postgres image tag"
+    required: false
+    default: "16.13-standard-trixie"
+  storage:
+    description: "PVC size (리뷰 M9: default 10Gi, local-path resize 미지원)"
+    required: false
+    default: "10Gi"
+  r2-account-id:
+    description: "Cloudflare account id (ObjectStore endpointURL 구성)"
+    required: true
+  r2-access-key-id:
+    description: "R2 access key (SealedSecret seal 용)"
+    required: true
+  r2-secret-access-key:
+    description: "R2 secret access key (SealedSecret seal 용)"
+    required: true
+  homelab-path:
+    description: "homelab repo 루트 경로 (setup-app composite 에서 checkout 한 _homelab 기준)"
+    required: false
+    default: "_homelab"
+
+outputs:
+  generated:
+    description: "매니페스트 생성 여부 (true/false — mode=none 이면 false)"
+    value: ${{ steps.finalize.outputs.generated }}
+
+runs:
+  using: composite
+  steps:
+    - name: Skip if mode=none
+      id: guard
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+      run: |
+        set -euo pipefail
+        if [ "$MODE" = "none" ] || [ -z "$MODE" ]; then
+          echo "mode=none, DB 매니페스트 생성 skip"
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Install kubeseal
+      if: steps.guard.outputs.skip != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v kubeseal >/dev/null 2>&1; then
+          echo "kubeseal 이미 설치"
+          exit 0
+        fi
+        VER="0.36.1"
+        curl -sSL -o /tmp/kubeseal.tar.gz \
+          "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${VER}/kubeseal-${VER}-linux-amd64.tar.gz"
+        tar -xzf /tmp/kubeseal.tar.gz -C /tmp kubeseal
+        sudo install -m 0755 /tmp/kubeseal /usr/local/bin/kubeseal
+        kubeseal --version
+
+    - name: Generate common/ manifests (owner scenario)
+      if: steps.guard.outputs.skip != 'true' && inputs.mode == 'owner'
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+        SERVICE: ${{ inputs.service-name }}
+        ROLE: ${{ inputs.role-name }}
+        DB: ${{ inputs.db-name }}
+        PG_TAG: ${{ inputs.pg-image-tag }}
+        STORAGE: ${{ inputs.storage }}
+        R2_ACCOUNT_ID: ${{ inputs.r2-account-id }}
+        R2_ACCESS_KEY_ID: ${{ inputs.r2-access-key-id }}
+        R2_SECRET_ACCESS_KEY: ${{ inputs.r2-secret-access-key }}
+        HOMELAB: ${{ inputs.homelab-path }}
+      run: |
+        set -euo pipefail
+
+        # 기본값
+        if [ -z "$ROLE" ]; then
+          ROLE="${SERVICE:-$APP}"
+        fi
+        if [ -z "$DB" ]; then
+          DB="$ROLE"
+        fi
+
+        TEMPLATE_DIR="${HOMELAB}/.github/templates/cnpg"
+        COMMON_DIR="${HOMELAB}/manifests/apps/${APP}/common"
+        mkdir -p "$COMMON_DIR"
+
+        # 1. namespace (이미 setup-app 상위에서 생성됐을 수도 있지만 idempotent 로 처리)
+        if [ ! -f "${COMMON_DIR}/namespace.yaml" ]; then
+          cat > "${COMMON_DIR}/namespace.yaml" <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: ${APP}
+          labels:
+            app.kubernetes.io/name: ${APP}
+            app.kubernetes.io/part-of: homelab
+            app.kubernetes.io/managed-by: argocd
+        EOF
+        fi
+
+        # 2. cluster / objectstore / scheduled-backup / network-policy 템플릿 치환
+        for tpl in cluster.yaml objectstore.yaml scheduled-backup.yaml network-policy.yaml; do
+          sed \
+            -e "s|__APP__|${APP}|g" \
+            -e "s|__PG_IMAGE_TAG__|${PG_TAG}|g" \
+            -e "s|__STORAGE__|${STORAGE}|g" \
+            -e "s|__R2_ACCOUNT_ID__|${R2_ACCOUNT_ID}|g" \
+            "${TEMPLATE_DIR}/${tpl}.tpl" \
+            > "${COMMON_DIR}/${tpl}"
+        done
+
+        # 3. Database CR (시나리오-1 공유 DB 가정. 시나리오-2 는 후속 확장에서 services/<svc>/database.yaml 로 분리)
+        sed \
+          -e "s|__APP__|${APP}|g" \
+          -e "s|__DB_NAME__|${DB}|g" \
+          -e "s|__ROLE_NAME__|${ROLE}|g" \
+          "${TEMPLATE_DIR}/database.yaml.tpl" \
+          > "${COMMON_DIR}/database-shared.yaml"
+
+        # 4. kustomization
+        sed -e "s|__APP__|${APP}|g" \
+          "${TEMPLATE_DIR}/kustomization.yaml.tpl" \
+          > "${COMMON_DIR}/kustomization.yaml"
+
+        # 5. Cluster managed.roles 병합 (리뷰 M4: unique_by idempotent)
+        if ! command -v yq >/dev/null 2>&1; then
+          echo "::error::yq 미설치. setup-app 상위에서 mikefarah/yq action 설치 필수"
+          exit 1
+        fi
+        ROLE_NAME="$ROLE" SECRET_NAME="${APP}-pg-${ROLE}-credentials" \
+          yq eval -i '
+            .spec.managed.roles = (
+              (.spec.managed.roles // []) + [{
+                "name": env(ROLE_NAME),
+                "ensure": "present",
+                "login": true,
+                "passwordSecret": { "name": env(SECRET_NAME) }
+              }]
+              | unique_by(.name)
+            )
+          ' "${COMMON_DIR}/cluster.yaml"
+
+        echo "✅ common/ manifests 생성 + managed.roles 병합 (role=${ROLE}, db=${DB})"
+
+    - name: Seal role password
+      if: steps.guard.outputs.skip != 'true' && inputs.mode == 'owner'
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+        SERVICE: ${{ inputs.service-name }}
+        ROLE: ${{ inputs.role-name }}
+        HOMELAB: ${{ inputs.homelab-path }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "$ROLE" ]; then
+          ROLE="${SERVICE:-$APP}"
+        fi
+
+        TEMPLATE_DIR="${HOMELAB}/.github/templates/cnpg"
+        COMMON_DIR="${HOMELAB}/manifests/apps/${APP}/common"
+
+        PASSWORD=$(openssl rand -base64 24)
+        PLAIN="/tmp/role-${APP}-${ROLE}.yaml"
+        SEALED="${COMMON_DIR}/role-secrets.sealed.yaml"
+
+        sed \
+          -e "s|__APP__|${APP}|g" \
+          -e "s|__ROLE_NAME__|${ROLE}|g" \
+          "${TEMPLATE_DIR}/role-secret.yaml.tpl" \
+          > "$PLAIN"
+        # password 치환. openssl rand -base64 24 출력은 [A-Za-z0-9+/=] — sed 구분자 `|` 는 안전.
+        # 단 특수문자 포함 가능성 대비 awk 로 literal 치환.
+        awk -v pw="$PASSWORD" '{gsub(/__PASSWORD__/, pw); print}' "$PLAIN" > "${PLAIN}.new"
+        mv "${PLAIN}.new" "$PLAIN"
+
+        # 이미 다른 role 이 seal 되어 append 필요 — 기존 파일 있으면 뒤에 --- 로 합침
+        TMP_SEALED="/tmp/role-sealed-${APP}-${ROLE}.yaml"
+        kubeseal --controller-namespace kube-system --controller-name sealed-secrets \
+          --format=yaml \
+          < "$PLAIN" \
+          > "$TMP_SEALED"
+        rm -f "$PLAIN"
+
+        if [ -f "$SEALED" ]; then
+          # append pattern
+          printf '\n---\n' >> "$SEALED"
+          cat "$TMP_SEALED" >> "$SEALED"
+        else
+          mv "$TMP_SEALED" "$SEALED"
+        fi
+        rm -f "$TMP_SEALED"
+
+        echo "✅ role '${ROLE}' SealedSecret seal 완료"
+
+    - name: Seal R2 credential (namespace-scoped)
+      if: steps.guard.outputs.skip != 'true' && inputs.mode == 'owner'
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+        R2_ACCESS_KEY_ID: ${{ inputs.r2-access-key-id }}
+        R2_SECRET_ACCESS_KEY: ${{ inputs.r2-secret-access-key }}
+        HOMELAB: ${{ inputs.homelab-path }}
+      run: |
+        set -euo pipefail
+
+        TEMPLATE_DIR="${HOMELAB}/.github/templates/cnpg"
+        COMMON_DIR="${HOMELAB}/manifests/apps/${APP}/common"
+        SEALED="${COMMON_DIR}/r2-backup.sealed.yaml"
+
+        if [ -f "$SEALED" ]; then
+          echo "⏭️  r2-backup.sealed.yaml 이미 존재, skip"
+          exit 0
+        fi
+
+        PLAIN="/tmp/r2-backup-${APP}.yaml"
+        sed \
+          -e "s|__APP__|${APP}|g" \
+          -e "s|__R2_ACCESS_KEY_ID__|${R2_ACCESS_KEY_ID}|g" \
+          -e "s|__R2_SECRET_ACCESS_KEY__|${R2_SECRET_ACCESS_KEY}|g" \
+          "${TEMPLATE_DIR}/r2-backup-secret.yaml.tpl" \
+          > "$PLAIN"
+
+        kubeseal --controller-namespace kube-system --controller-name sealed-secrets \
+          --format=yaml \
+          < "$PLAIN" \
+          > "$SEALED"
+        rm -f "$PLAIN"
+
+        echo "✅ r2-backup SealedSecret seal 완료 (namespace=${APP})"
+
+    - name: Finalize
+      id: finalize
+      shell: bash
+      env:
+        SKIP: ${{ steps.guard.outputs.skip }}
+      run: |
+        if [ "$SKIP" = "true" ]; then
+          echo "generated=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "generated=true" >> "$GITHUB_OUTPUT"
+        fi
