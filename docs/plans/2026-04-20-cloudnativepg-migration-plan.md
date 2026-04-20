@@ -495,9 +495,13 @@ cat /tmp/apps-appproject.yaml
 
 **Step 1: 로컬 kubeseal 에서 fetch-cert 확인**
 
+> **홈랩 실측 (2026-04-20)**: sealed-secrets 는 `kube-system` ns 에 helm release 이름 `sealed-secrets` 로 배포됨. `--controller-namespace kube-system --controller-name sealed-secrets` 사용 (04_kubeseal-endpoint.md).
+
 ```bash
-kubectl -n sealed-secrets get svc sealed-secrets-controller -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].port}'
-kubeseal --controller-namespace sealed-secrets --controller-name sealed-secrets-controller \
+# Service 확인
+kubectl -n kube-system get svc sealed-secrets -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].port}'
+# kubeseal fetch-cert
+kubeseal --controller-namespace kube-system --controller-name sealed-secrets \
   --fetch-cert > /tmp/cert.pem
 cat /tmp/cert.pem | head -5
 ```
@@ -510,8 +514,8 @@ echo "test-secret-value" | kubectl create secret generic test-seal \
   --dry-run=client --from-literal=key=- -o yaml \
   > /tmp/test-seal.yaml
 
-kubeseal --controller-namespace sealed-secrets \
-         --controller-name sealed-secrets-controller \
+kubeseal --controller-namespace kube-system \
+         --controller-name sealed-secrets \
          --format=yaml \
          < /tmp/test-seal.yaml \
          > /tmp/test-sealed.yaml
@@ -538,8 +542,8 @@ kubectl -n actions-runner-system run kubeseal-test --rm -it --restart=Never \
   --command -- sh -c '
     echo "test-e2e-value" | kubectl create secret generic test-seal \
       --dry-run=client --from-literal=k=- -o yaml | \
-    kubeseal --controller-namespace sealed-secrets \
-             --controller-name sealed-secrets-controller \
+    kubeseal --controller-namespace kube-system \
+             --controller-name sealed-secrets \
              --format=yaml \
     | grep -q "encryptedData:" && echo "✅ in-cluster seal 성공" || echo "❌ in-cluster seal 실패"
   '
@@ -556,8 +560,8 @@ jobs:
     steps:
       - run: |
           echo "test" | kubectl create secret generic test --dry-run=client --from-literal=k=- -o yaml | \
-          kubeseal --controller-namespace sealed-secrets \
-                   --controller-name sealed-secrets-controller \
+          kubeseal --controller-namespace kube-system \
+                   --controller-name sealed-secrets \
                    --format=yaml > /tmp/sealed.yaml
           grep -q "encryptedData:" /tmp/sealed.yaml && echo "OK" || exit 1
 ```
@@ -1557,7 +1561,7 @@ stringData:
   password: ${PASSWORD}
 EOF
 
-kubeseal --controller-namespace sealed-secrets --controller-name sealed-secrets-controller \
+kubeseal --controller-namespace kube-system --controller-name sealed-secrets \
   --format=yaml \
   < /tmp/trial-role.yaml \
   > manifests/apps/pg-trial/role-secrets.sealed.yaml
@@ -1837,7 +1841,7 @@ stringData:
   SECRET_ACCESS_KEY: "${R2_SECRET_ACCESS_KEY}"
 EOF
 
-kubeseal --controller-namespace sealed-secrets --controller-name sealed-secrets-controller \
+kubeseal --controller-namespace kube-system --controller-name sealed-secrets \
   --format=yaml \
   < /tmp/r2-backup.yaml \
   > manifests/apps/pg-trial/r2-backup.sealed.yaml
@@ -2256,8 +2260,8 @@ stringData:
 EOF
 
 # 4) namespace-scoped seal
-kubeseal --controller-namespace sealed-secrets \
-         --controller-name sealed-secrets-controller \
+kubeseal --controller-namespace kube-system \
+         --controller-name sealed-secrets \
          --format=yaml \
          < /tmp/r2-backup-restore.yaml \
          > /tmp/r2-backup-restore.sealed.yaml
@@ -2371,61 +2375,105 @@ git push origin main
 
 # Phase 5: 모니터링 통합
 
-## Task 5.1: Alloy scrape config 추가
+## Task 5.1: CNPG 메트릭 scrape 경로 확보 (Phase 0 Task 0.4 §5 실측 반영)
+
+> **Phase 0 실측 결과 반영 (`01_baseline.md` §5)**: 홈랩 메트릭 수집은 **Alloy 가 아니라 VictoriaMetrics 자체 scrape** (`manifests/monitoring/victoria-metrics/scrape-config.yaml`, Prometheus YAML) 가 담당. Alloy 는 로그 전용.
+>
+> VM scrape-config 은 이미 `kubernetes-pods` job 이 `prometheus.io/scrape=true` annotation 기반 auto-discovery 를 수행 → **CNPG pod 와 operator Service 에 annotation 만 부여하면 별도 job 작성 불필요**.
 
 **Files:**
-- Modify: `manifests/monitoring/alloy/<config파일>` (실제 경로 확인 후)
+- Modify: `manifests/apps/pg-trial/cluster.yaml` (`spec.monitoring.podMetricsEndpoints` 또는 pod annotations)
+- Modify: `manifests/infra/cnpg-operator/metrics-service.yaml` (Task 5.1.1 생성분 — Service annotation 추가)
 
-**Step 1: 기존 Alloy config 파악**
+**Step 1: CNPG Cluster pod 에 scrape annotation 부여**
 
-Run: `grep -rn "kubernetes_sd_configs\|prometheus.scrape" manifests/monitoring/alloy/ | head`
+CNPG operator 는 `Cluster.spec.monitoring.customQueriesConfigMap` + 자동 exporter sidecar 로 `:9187` 메트릭 노출. Cluster pod annotation 을 설정하려면:
 
-**Step 2: CNPG job 추가**
-
-Alloy 설정 파일(River syntax)에 다음 블록 추가 또는 기존 discovery에 relabel 추가:
-```river
-prometheus.scrape "cnpg" {
-  targets = discovery.kubernetes.cnpg_pods.targets
-  forward_to = [prometheus.remote_write.victoriametrics.receiver]
-  job_name = "cnpg"
-}
-
-discovery.kubernetes "cnpg_pods" {
-  role = "pod"
-  selectors {
-    role = "pod"
-    field = "status.phase=Running"
-  }
-}
-
-discovery.relabel "cnpg_pods" {
-  targets = discovery.kubernetes.cnpg_pods.targets
-  rule {
-    source_labels = ["__meta_kubernetes_pod_label_cnpg_io_cluster"]
-    action = "keep"
-    regex = ".+"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_container_port_number"]
-    action = "keep"
-    regex = "9187"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_label_cnpg_io_cluster"]
-    target_label = "cluster"
-  }
-}
+옵션 A — `spec.monitoring` (operator 가 pod annotation 자동 주입):
+```yaml
+# manifests/apps/pg-trial/cluster.yaml (Task 3.3 에서 작성한 파일 수정)
+spec:
+  monitoring:
+    enablePodMonitor: false
+    # CNPG 1.24+ 지원: annotation 직접 주입 키 (chart values 로도 설정 가능)
+    # 실제 키명은 Phase 3 PoC 에서 `kubectl explain cluster.spec.monitoring --recursive` 로 확인
 ```
-> v0.4 리뷰 M2 반영: Phase 0 Task 0.4 Step 4 에서 기존 Alloy config 형식 (River vs Prometheus YAML) 을 박제. 위 예시는 River 형식. Phase 0 결과가 Prometheus YAML 이면 이 블록을 해당 형식으로 바꿔 작성하고, 반대의 경우 River 로 유지. **둘 다 제시하는 fallback 방식 폐기** — 운영자가 실행 시 어느 형식 쓸지 혼란 방지.
 
-**Step 3: 커밋 + Alloy 재시작 대기 (ArgoCD selfHeal 또는 수동 sync)**
+옵션 B — podTemplate override (모든 버전 호환):
+```yaml
+spec:
+  inheritedMetadata:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9187"
+      prometheus.io/path: "/metrics"
+```
+
+CNPG `.spec.inheritedMetadata` 는 operator 가 managed Pod (instance pod) 에 그대로 전파 → VM `kubernetes-pods` job 이 자동 scrape.
+
+**Step 2: Operator Service 에 scrape annotation (Task 5.1.1 metrics-service.yaml 수정)**
+
+```yaml
+# manifests/infra/cnpg-operator/metrics-service.yaml (Task 5.1.1 에서 생성한 파일)
+apiVersion: v1
+kind: Service
+metadata:
+  name: cnpg-controller-manager-metrics
+  namespace: cnpg-system
+  annotations:
+    # VM kubernetes-service-endpoints job 이 자동 discovery
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: manager-metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: manager
+```
+
+**Step 3: 별도 scrape job 작성이 필요한 경우만 (예외)**
+
+annotation 접근이 안 되는 경우 (예: CNPG 가 inheritedMetadata 무시) 에만 `scrape-config.yaml` 에 전용 job 추가:
+
+```yaml
+# manifests/monitoring/victoria-metrics/scrape-config.yaml 에 추가
+- job_name: cnpg-instances
+  kubernetes_sd_configs:
+    - role: pod
+  relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_label_cnpg_io_cluster]
+      action: keep
+      regex: .+
+    - source_labels: [__meta_kubernetes_pod_container_port_number]
+      action: keep
+      regex: "9187"
+    - source_labels: [__meta_kubernetes_pod_label_cnpg_io_cluster]
+      target_label: cluster
+    - source_labels: [__meta_kubernetes_namespace]
+      target_label: namespace
+```
+
+> **우선순위**: Step 1 (inheritedMetadata) → Step 2 (Service annotation) → Step 3 (전용 job). Phase 3 PoC 에서 Step 1 로 먼저 시도하고, annotation 전파 안 되면 Step 3 로 fallback.
+
+**Step 4: 커밋 + VM 재시작 (ConfigMap 업데이트 반영)**
 
 Run:
 ```bash
-git add manifests/monitoring/alloy/
-git commit -m "feat(alloy): scrape CNPG pod metrics on :9187"
+git add manifests/apps/pg-trial/cluster.yaml manifests/infra/cnpg-operator/metrics-service.yaml
+git commit -m "feat(monitoring): enable VM auto-discovery for CNPG pod/operator metrics"
 git push origin main
-argocd app sync alloy
+argocd app sync victoria-metrics cnpg-operator
+# ConfigMap 업데이트 → VM reload (hot reload 지원 여부에 따라 pod restart 필요 가능)
+kubectl -n monitoring rollout restart statefulset/victoria-metrics
 ```
 
 ## Task 5.1.1: operator 자체 메트릭 Service 보완 (리뷰 C3 조건부 신규)
@@ -2540,31 +2588,28 @@ Expected: 각 ≥1. 0이면:
 - Task 5.1 Alloy scrape 설정이 cluster pod 9187 만 대상 → cnpg-system:8080 추가 필요 (selectors `namespace=cnpg-system` + `port=8080`)
 - 또는 Task 5.1.1 metrics Service 가 없거나 selector 불일치
 
-**Step 5: Alloy scrape config 에 operator job 추가 (Step 4 실패 시)**
+**Step 5: VM scrape-config 에 operator 전용 job 추가 (Step 4 실패 시, Prometheus YAML)**
 
-기존 `prometheus.scrape "cnpg"` 블록 아래에 operator 전용 job 추가:
-```river
-prometheus.scrape "cnpg_operator" {
-  targets = discovery.relabel.cnpg_operator.output
-  forward_to = [prometheus.remote_write.victoriametrics.receiver]
-  job_name = "cnpg-operator"
-}
+> Task 5.1 Step 2 의 Service annotation 이 동작하면 `kubernetes-service-endpoints` job 이 자동 수집 — 별도 job 불필요. 실패 시에만 아래 추가.
 
-discovery.kubernetes "cnpg_operator_pods" {
-  role = "pod"
-  namespaces { names = ["cnpg-system"] }
-}
-
-discovery.relabel "cnpg_operator" {
-  targets = discovery.kubernetes.cnpg_operator_pods.targets
-  rule {
-    source_labels = ["__meta_kubernetes_pod_container_port_number"]
-    action = "keep"
-    regex = "8080"
-  }
-}
+`manifests/monitoring/victoria-metrics/scrape-config.yaml` 에 추가:
+```yaml
+- job_name: cnpg-operator
+  kubernetes_sd_configs:
+    - role: pod
+      namespaces:
+        names: ["cnpg-system"]
+  relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_container_port_number]
+      action: keep
+      regex: "8080"
+    - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+      action: keep
+      regex: cloudnative-pg
+    - source_labels: [__meta_kubernetes_namespace]
+      target_label: namespace
 ```
-Commit + argocd sync alloy → Step 4 재검증.
+Commit + argocd sync victoria-metrics → VM reload → Step 4 재검증.
 
 ## Task 5.3: Grafana dashboard import
 
@@ -2970,10 +3015,26 @@ git add manifests/apps/<first-project>/common/
 git commit -m "feat(<first-project>): add CNPG database manifests"
 ```
 
-## Task 6.3: ArgoCD Application 선언 (v0.4 리뷰 P7 · ignoreDifferences 사전 준비)
+## Task 6.3: ArgoCD Application 선언 (v0.4 리뷰 P7 · ignoreDifferences 사전 준비 + Phase 0 Task 0.7 발견: apps destinations 갱신)
 
 **Files:**
+- Modify: `manifests/infra/argocd/appproject-apps.yaml` (또는 실제 파일 — destinations 추가)
 - Create: `argocd/applications/apps/<first-project>.yaml`
+
+**Step 0: apps AppProject `destinations` 에 `<first-project>` namespace 추가 (Phase 0 Task 0.7 §4 발견)**
+
+Phase 0 Task 0.7 박제 (`_workspace/cnpg-migration/03_appproject-diff.md`) 에 따르면 apps AppProject `destinations` 는 현재 `apps` · `test-web` 만 허용. 새 프로젝트 namespace 가 없으면 sync 시 `Application destination is not permitted` 에러.
+
+```yaml
+# manifests/infra/argocd/appproject-apps.yaml (실제 경로는 `grep -rn "kind: AppProject" manifests/infra/argocd/`)
+spec:
+  destinations:
+    # 기존 유지
+    - namespace: <first-project>              # 추가
+      server: https://kubernetes.default.svc
+```
+
+**→ 이 변경은 Application 매니페스트 PR 과 같은 PR 로 묶어도 되고, 선행 PR 로 분리해도 무관. apps AppProject 는 infra ArgoCD Application 이 관리하므로 merge 후 selfHeal 이 반영.**
 
 **Step 1: Application YAML (기존 패턴 재사용 + ignoreDifferences 사전 틀)**
 
