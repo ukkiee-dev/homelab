@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
-  description: Infrastructure components (sealed-secrets, traefik, tailscale-operator, cert-manager)
+  description: Infrastructure components (sealed-secrets, traefik, tailscale-operator, cert-manager, cloudnative-pg)
   sourceRepos:
     - "https://github.com/ukkiee-dev/homelab.git"
     - "https://bitnami-labs.github.io/sealed-secrets"
@@ -16,6 +16,8 @@ spec:
     - "ghcr.io/actions/actions-runner-controller-charts"
     # Phase 1 (CNPG migration): cert-manager Helm chart
     - "https://charts.jetstack.io"
+    # Phase 2 (CNPG migration): CNPG operator Helm chart
+    - "https://cloudnative-pg.github.io/charts"
   destinations:
     - namespace: kube-system
       server: https://kubernetes.default.svc
@@ -41,6 +43,9 @@ spec:
       server: https://kubernetes.default.svc
     # Phase 1 (CNPG migration): cert-manager 전용 namespace
     - namespace: cert-manager
+      server: https://kubernetes.default.svc
+    # Phase 2 (CNPG migration): operator + plugin 전용 namespace
+    - namespace: cnpg-system
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
@@ -81,3 +86,7 @@ spec:
     # ClusterIssuer 는 Phase 8 도입 예정이지만 사전 등재하여 나중에 whitelist 추가 PR 불필요.
     - group: cert-manager.io
       kind: ClusterIssuer
+    # Phase 2 (CNPG migration): CNPG operator + plugin-barman-cloud cluster-scoped 리소스는
+    # 기존 apiextensions.k8s.io/CustomResourceDefinition + rbac.authorization.k8s.io/ClusterRole+ClusterRoleBinding +
+    # admissionregistration.k8s.io/Validating+MutatingWebhookConfiguration whitelist 로 모두 커버.
+    # postgresql.cnpg.io/* · barmancloud.cnpg.io/* CR 은 namespace-scoped 로 apps AppProject 범위.

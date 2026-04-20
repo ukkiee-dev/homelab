@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cnpg-operator
+  namespace: argocd
+  annotations:
+    # cert-manager 다음. Plugin (wave -1) 보다 먼저 (CNPG CRD 가 Plugin Certificate 의존)
+    argocd.argoproj.io/sync-wave: "-2"
+  labels:
+    app.kubernetes.io/name: cnpg-operator
+    app.kubernetes.io/component: database-operator
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: infra
+  sources:
+    # [0] Helm chart (Phase 0 I-2 에서 pin)
+    - chart: cloudnative-pg
+      repoURL: https://cloudnative-pg.github.io/charts
+      targetRevision: "0.28.0"
+      helm:
+        releaseName: cnpg
+        valueFiles:
+          - $values/manifests/infra/cnpg-operator/values.yaml
+    # [1] Git overlay (values + namespace + 향후 metrics-service Phase 5)
+    - repoURL: https://github.com/ukkiee-dev/homelab.git
+      targetRevision: main
+      path: manifests/infra/cnpg-operator
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cnpg-system
+  # v0.4 리뷰 P7 예비: operator 가 default 값 자동 채움 drift 관찰 시 활성화 예정
+  # ignoreDifferences:
+  #   - group: postgresql.cnpg.io
+  #     kind: Cluster
+  #     jqPathExpressions:
+  #       - '.spec.bootstrap.initdb.encoding'
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

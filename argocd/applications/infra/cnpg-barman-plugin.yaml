@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cnpg-barman-plugin
+  namespace: argocd
+  annotations:
+    # CNPG operator (wave -2) 다음. Plugin 은 CNPG CRD 생성 후 배포되어야 정상 reconcile.
+    # cert-manager (wave -3) 이 발급할 gRPC mTLS Certificate 포함.
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    app.kubernetes.io/name: cnpg-barman-plugin
+    app.kubernetes.io/component: database-backup-plugin
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: infra
+  # single source: plugin 은 upstream release 의 manifest.yaml 를 로컬로 커밋하여 관리
+  # (Renovate 추적을 위한 디자인 결정, 13_bitnami-drift-decision.md 의 Git 우선 원칙과 일치)
+  source:
+    repoURL: https://github.com/ukkiee-dev/homelab.git
+    targetRevision: main
+    path: manifests/infra/cnpg-barman-plugin
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cnpg-system
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

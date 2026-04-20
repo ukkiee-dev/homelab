@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plugin-barman-cloud 는 Helm chart 가 아니라 upstream release 의 raw manifest.yaml
+# 을 그대로 사용한다. Renovate 버전 추적을 위해 로컬로 다운받아 Git 에 커밋.
+# 업그레이드 시:
+#   curl -sSL -o manifests/infra/cnpg-barman-plugin/manifest.yaml \
+#     "https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/<VER>/manifest.yaml"
+#
+# Phase 0 Task 0.2 pin: v0.12.0 (2026-04-14)
+# 포함 리소스 (17 개):
+#   - ObjectStore CRD (barmancloud.cnpg.io/v1)
+#   - Deployment/Service/ServiceAccount (cnpg-system 네임스페이스)
+#   - Certificate + Issuer (cert-manager 발급 · gRPC mTLS)
+#   - ClusterRole/ClusterRoleBinding 5+2, Role/RoleBinding 1+1, Secret 1
+resources:
+  - manifest.yaml
