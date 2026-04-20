@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pokopia-wiki
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: pokopia-wiki
+    app.kubernetes.io/component: wiki
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  # CNPG Cluster 는 manifest 자체이므로 single source (Helm chart 없음, Git-only)
+  source:
+    repoURL: https://github.com/ukkiee-dev/homelab.git
+    targetRevision: main
+    path: manifests/apps/pokopia-wiki
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pokopia-wiki
+  # v0.4 리뷰 P7: CNPG operator 가 Cluster spec 에 default 값 자동 채움 가능.
+  # Phase 6 첫 sync 후 drift 관찰되면 구체적 경로를 jqPathExpressions 로 추가.
+  # 관찰 후보: .spec.bootstrap.initdb.encoding, .spec.monitoring.disableDefaultQueries, .spec.managed.roles[].passwordSecret (회전 시)
+  # ignoreDifferences:
+  #   - group: postgresql.cnpg.io
+  #     kind: Cluster
+  #     name: pokopia-wiki-pg
+  #     namespace: pokopia-wiki
+  #     jqPathExpressions:
+  #       - '.spec.bootstrap.initdb.encoding'
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

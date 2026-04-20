@@ -10,6 +10,7 @@ resources:
   - limitrange-traefik-system.yaml
   - limitrange-networking.yaml
   - limitrange-test-web.yaml
+  - limitrange-pokopia-wiki.yaml
   - resourcequota-argocd.yaml
   - resourcequota-monitoring.yaml
   - resourcequota-apps.yaml
@@ -17,4 +18,5 @@ resources:
   - resourcequota-traefik-system.yaml
   - resourcequota-networking.yaml
   - resourcequota-test-web.yaml
+  - resourcequota-pokopia-wiki.yaml
   - resourcequota-actions-runner-system.yaml

@@ -1,0 +1,17 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: pokopia-wiki-pg-daily
+  namespace: pokopia-wiki
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  # UTC 18:00 = KST 03:00 (새벽 저부하 시간대)
+  schedule: "0 0 18 * * *"
+  cluster:
+    name: pokopia-wiki-pg
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+  # v0.4 리뷰 C4: Backup CR audit trail 보존 (spec 변경 시 cascade 방지).
+  backupOwnerReference: cluster
