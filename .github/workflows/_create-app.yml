@@ -26,6 +26,41 @@ on:
         required: false
         type: string
         default: ""
+      database-enabled:
+        description: "CNPG DB 생성 여부 (Phase 7). false 면 DB 매니페스트 생성 skip."
+        required: false
+        type: boolean
+        default: false
+      database-mode:
+        description: "owner | reference | none (default=none)"
+        required: false
+        type: string
+        default: "none"
+      database-name:
+        description: "Database 이름 (database-mode=owner 필수)"
+        required: false
+        type: string
+        default: ""
+      database-role:
+        description: "role 이름. 비어있으면 service-name 또는 app-name 기반 기본값"
+        required: false
+        type: string
+        default: ""
+      database-ref:
+        description: "참조 대상 owner 서비스 이름 (database-mode=reference 전용)"
+        required: false
+        type: string
+        default: ""
+      database-storage:
+        description: "PVC size (리뷰 M9: default 10Gi, local-path resize 미지원)"
+        required: false
+        type: string
+        default: "10Gi"
+      database-pg-image-tag:
+        description: "CNPG postgres image tag"
+        required: false
+        type: string
+        default: "16.13-standard-trixie"
     secrets:
       APP_ID:
         required: true
@@ -168,6 +203,14 @@ jobs:
           r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           domain: ${{ secrets.TF_DOMAIN }}
+          # Phase 7 B: CNPG DB inputs passthrough
+          database-enabled: ${{ inputs.database-enabled }}
+          database-mode: ${{ inputs.database-mode }}
+          database-name: ${{ inputs.database-name }}
+          database-role: ${{ inputs.database-role }}
+          database-ref: ${{ inputs.database-ref }}
+          database-storage: ${{ inputs.database-storage }}
+          database-pg-image-tag: ${{ inputs.database-pg-image-tag }}
 
       # ── Notify ─────────────────────────────────────────────
       - name: Notify success (Telegram)

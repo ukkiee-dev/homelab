@@ -18,6 +18,14 @@ inputs:
   domain:               { required: false, default: "ukkiee.dev" }
   icon:                 { required: false, default: "mdi-application" }
   description:          { required: false, default: "" }
+  # Phase 7 B: CNPG DB inputs (default=false 면 DB composite step skip, 기존 앱 영향 0)
+  database-enabled:       { required: false, default: "false", description: "CNPG DB 생성 여부" }
+  database-mode:          { required: false, default: "none",  description: "owner | reference | none" }
+  database-name:          { required: false, default: "",      description: "Database 이름 (mode=owner 필수)" }
+  database-role:          { required: false, default: "",      description: "role 이름 (비면 service-name 또는 app-name)" }
+  database-ref:           { required: false, default: "",      description: "참조 대상 owner 서비스 (mode=reference 전용)" }
+  database-storage:       { required: false, default: "10Gi",  description: "PVC size (리뷰 M9)" }
+  database-pg-image-tag:  { required: false, default: "16.13-standard-trixie", description: "CNPG postgres image tag" }
 
 outputs:
   tunnel-status:
@@ -830,6 +838,53 @@ runs:
 
         yq eval -i '.' "$APP_FILE"
         echo "✅ ArgoCD Application 생성 완료 (monorepo shell)"
+
+    # ── Step 3c: CNPG DB 매니페스트 생성 (Phase 7 B) ──────────────
+    # database-enabled=true + 모노레포 (service-name 있음) + mode=owner 에서만 실행.
+    # flat 앱은 현재 common/ 구조가 없어 database composite 와 충돌 가능 → 후속 확장에서 지원.
+    - name: Warn if database-enabled on flat app
+      if: inputs.database-enabled == 'true' && inputs.service-name == ''
+      shell: bash
+      run: |
+        echo "::warning::database-enabled=true 는 현재 모노레포 (service-name 있음) 앱만 지원합니다. flat 앱 DB 는 향후 지원 예정. database composite step 을 skip 합니다."
+
+    - name: Setup CNPG database
+      if: inputs.database-enabled == 'true' && inputs.service-name != '' && inputs.database-mode == 'owner'
+      uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
+      with:
+        app-name:             ${{ inputs.app-name }}
+        service-name:         ${{ inputs.service-name }}
+        mode:                 ${{ inputs.database-mode }}
+        db-name:              ${{ inputs.database-name }}
+        ref-db:               ${{ inputs.database-ref }}
+        role-name:            ${{ inputs.database-role }}
+        pg-image-tag:         ${{ inputs.database-pg-image-tag }}
+        storage:              ${{ inputs.database-storage }}
+        r2-account-id:        ${{ inputs.tf-account-id }}
+        r2-access-key-id:     ${{ inputs.r2-access-key-id }}
+        r2-secret-access-key: ${{ inputs.r2-secret-access-key }}
+        homelab-path:         _homelab
+
+    - name: Update ArgoCD Application for DB common/
+      if: inputs.database-enabled == 'true' && inputs.service-name != '' && inputs.database-mode == 'owner'
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+      run: |
+        set -euo pipefail
+        # database composite 가 manifests/apps/<app>/common/ 을 생성함.
+        # 기존 monorepo ArgoCD Application 은 이미 path=manifests/apps/<app> 이고
+        # 루트 kustomization 이 common/ 을 참조하도록 composite 가 관리.
+        # 추가 작업 없이 root kustomization 에 common/ 추가 확인.
+        ROOT_KUST="_homelab/manifests/apps/$APP/kustomization.yaml"
+        if [ -f "$ROOT_KUST" ]; then
+          if ! yq eval '.resources[]' "$ROOT_KUST" | grep -qx "common"; then
+            yq eval -i '.resources = (.resources + ["common"] | unique)' "$ROOT_KUST"
+            echo "✅ 루트 kustomization 에 common/ 추가 (DB 매니페스트 참조)"
+          else
+            echo "⏭️  root kustomization 에 common/ 이미 존재"
+          fi
+        fi
 
     # ── Step 4: git commit & push (terraform 완료 후) ─────────────
     - name: Commit & Push
