@@ -115,10 +115,12 @@ resources:
 service:
   spec:
     externalTrafficPolicy: Local
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "9100"
-    prometheus.io/path: "/metrics"
+  # prometheus scrape annotation 은 service 에서 제거한다.
+  # Traefik chart 가 metrics.prometheus 활성화 시 pod 에 prometheus.io/*
+  # annotation 을 자동 주입하므로, kubernetes-pods job 에서 단일 경로로
+  # 수집된다. Service 에도 annotation 을 두면 동일 pod 가 service-endpoints
+  # job 으로 중복 수집되어 helm.sh/chart 라벨(서비스와 pod 의 chart 라벨
+  # 불일치) 때문에 동일 메트릭이 두 시리즈로 갈라지는 문제가 있었다.
 
 providers:
   kubernetesCRD:
