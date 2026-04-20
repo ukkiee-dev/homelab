@@ -33,16 +33,19 @@ webhook:
       cpu: 100m
       memory: 64Mi
 
-# cainjector
+# cainjector — CRD cache sync (Certificate + MutatingWebhookConfiguration + PartialObjectMetadata 등)
+# 에 메모리·CPU 필요. Phase 1 초기 64Mi limit 에서 CRD list+watch 가 2m 21s timeout 관찰 →
+# leader election 상실 → CrashLoop (restart count 75).
+# cert-manager 공식 권장치는 cainjector 메모리 500Mi 수준. 홈랩 PoC 로 256Mi 상향.
 cainjector:
   replicaCount: 1
   resources:
     requests:
-      cpu: 10m
-      memory: 32Mi
+      cpu: 50m
+      memory: 128Mi
     limits:
-      cpu: 100m
-      memory: 64Mi
+      cpu: 500m
+      memory: 256Mi
 
 # Prometheus 메트릭 노출 (chart default true). Alloy 는 로그 전용, 메트릭은 VM 이
 # prometheus.io/scrape annotation 기반 auto-discovery 하므로 Service/Pod 에 annotation

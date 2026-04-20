@@ -20,16 +20,21 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: pokopia-wiki
-  # v0.4 리뷰 P7: CNPG operator 가 Cluster spec 에 default 값 자동 채움 가능.
-  # Phase 6 첫 sync 후 drift 관찰되면 구체적 경로를 jqPathExpressions 로 추가.
-  # 관찰 후보: .spec.bootstrap.initdb.encoding, .spec.monitoring.disableDefaultQueries, .spec.managed.roles[].passwordSecret (회전 시)
-  # ignoreDifferences:
-  #   - group: postgresql.cnpg.io
-  #     kind: Cluster
-  #     name: pokopia-wiki-pg
-  #     namespace: pokopia-wiki
-  #     jqPathExpressions:
-  #       - '.spec.bootstrap.initdb.encoding'
+  # v0.4 리뷰 P7 활성화 (2026-04-21 Phase 6 drift 관찰 후):
+  # CNPG operator 가 SSA 로 Cluster spec 에 default 값 자동 채움 — affinity, bootstrap.initdb,
+  # enablePDB, enableSuperuserAccess, failoverDelay, logLevel, managed.roles[].connectionLimit/inherit,
+  # maxSyncReplicas/minSyncReplicas, monitoring.customQueriesConfigMap/disableDefaultQueries,
+  # plugins[].enabled 등.
+  #
+  # 개별 경로 나열 대신 managedFieldsManagers 로 operator SSA 관리 필드 전체 제외.
+  # 메모리 `project_traefik_helm_v39_gomemlimit_ssa` 정신과 일관 (SSA ownership 충돌 회피).
+  ignoreDifferences:
+    - group: postgresql.cnpg.io
+      kind: Cluster
+      name: pokopia-wiki-pg
+      namespace: pokopia-wiki
+      managedFieldsManagers:
+        - cloudnative-pg
   syncPolicy:
     automated:
       selfHeal: true
