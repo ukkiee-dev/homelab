@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    # CNPG plugin 이전 설치 (plugin 이 cert-manager Issuer 로 gRPC mTLS 발급)
+    argocd.argoproj.io/sync-wave: "-3"
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/component: cert-issuer
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: infra
+  # multi-source pattern (Phase 0 D-5 (b) 확정, traefik 전례 일치)
+  sources:
+    # [0] Helm chart
+    - chart: cert-manager
+      repoURL: https://charts.jetstack.io
+      targetRevision: "v1.20.2"
+      helm:
+        releaseName: cert-manager
+        valueFiles:
+          - $values/manifests/infra/cert-manager/values.yaml
+    # [1] Git overlay (values 제공 + namespace + 향후 ClusterIssuer)
+    - repoURL: https://github.com/ukkiee-dev/homelab.git
+      targetRevision: main
+      path: manifests/infra/cert-manager
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

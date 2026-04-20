@@ -7,13 +7,15 @@ metadata:
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
-  description: Infrastructure components (sealed-secrets, traefik, tailscale-operator)
+  description: Infrastructure components (sealed-secrets, traefik, tailscale-operator, cert-manager)
   sourceRepos:
     - "https://github.com/ukkiee-dev/homelab.git"
     - "https://bitnami-labs.github.io/sealed-secrets"
     - "https://traefik.github.io/charts"
     - "https://pkgs.tailscale.com/helmcharts"
     - "ghcr.io/actions/actions-runner-controller-charts"
+    # Phase 1 (CNPG migration): cert-manager Helm chart
+    - "https://charts.jetstack.io"
   destinations:
     - namespace: kube-system
       server: https://kubernetes.default.svc
@@ -36,6 +38,9 @@ spec:
     - namespace: monitoring
       server: https://kubernetes.default.svc
     - namespace: test-web
+      server: https://kubernetes.default.svc
+    # Phase 1 (CNPG migration): cert-manager 전용 namespace
+    - namespace: cert-manager
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
@@ -71,3 +76,8 @@ spec:
       kind: ProxyGroup
     - group: tailscale.com
       kind: Recorder
+    # Phase 1+ (CNPG migration): cert-manager cluster-scoped CR.
+    # Issuer/Certificate/CertificateRequest/Order/Challenge 는 모두 namespace-scoped 라 whitelist 불필요.
+    # ClusterIssuer 는 Phase 8 도입 예정이지만 사전 등재하여 나중에 whitelist 추가 PR 불필요.
+    - group: cert-manager.io
+      kind: ClusterIssuer
