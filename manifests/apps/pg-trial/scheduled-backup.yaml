@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: pg-trial-pg-daily
+  namespace: pg-trial
+spec:
+  # UTC 18:00 = KST 03:00 (한국 기준 새벽 저부하 시간대)
+  schedule: "0 0 18 * * *"
+  cluster:
+    name: pg-trial-pg
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+  # v0.4 H5 / 리뷰 C4: Backup CR audit trail 보존.
+  # ScheduledBackup spec 변경 시 Backup CR cascade 방지 (Cluster 삭제 시에만 GC).
+  backupOwnerReference: cluster
