@@ -1,0 +1,67 @@
+# ArgoCD 컴포넌트 metrics scrape 용 Service.
+# Helm chart의 controller/server/repoServer.metrics.enabled=true 설정에도 불구하고
+# 현 Helm 배포가 metrics Service를 생성하지 않는 문제를 kustomize로 우회한다.
+# prometheus.io/scrape annotation 으로 VictoriaMetrics 의
+# `kubernetes-service-endpoints` job 에 자동 편입된다.
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-metrics
+  labels:
+    app.kubernetes.io/name: argocd-metrics
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8082"
+spec:
+  selector:
+    app.kubernetes.io/name: argocd-application-controller
+  ports:
+    - name: metrics
+      port: 8082
+      protocol: TCP
+      targetPort: 8082
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server-metrics
+  labels:
+    app.kubernetes.io/name: argocd-server-metrics
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8083"
+spec:
+  selector:
+    app.kubernetes.io/name: argocd-server
+  ports:
+    - name: metrics
+      port: 8083
+      protocol: TCP
+      targetPort: 8083
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-repo-server-metrics
+  labels:
+    app.kubernetes.io/name: argocd-repo-server-metrics
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8084"
+spec:
+  selector:
+    app.kubernetes.io/name: argocd-repo-server
+  ports:
+    - name: metrics
+      port: 8084
+      protocol: TCP
+      targetPort: 8084

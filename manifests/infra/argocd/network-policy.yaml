@@ -102,3 +102,37 @@ spec:
       ports:
         - protocol: TCP
           port: 80
+---
+# Monitoring (VictoriaMetrics scraper) → ArgoCD metrics ports (ingress)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-metrics-scrape
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - argocd-application-controller
+          - argocd-server
+          - argocd-repo-server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8082
+        - protocol: TCP
+          port: 8083
+        - protocol: TCP
+          port: 8084

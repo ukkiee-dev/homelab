@@ -11,3 +11,4 @@ resources:
   - ingressroute.yaml
   - ingressroute-api.yaml
   - network-policy.yaml
+  - metrics-services.yaml
