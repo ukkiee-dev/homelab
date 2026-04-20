@@ -2,6 +2,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: monitoring
 generatorOptions:
+  # hash suffix 를 끄면 ConfigMap 이름이 고정되어 ArgoCD 가 매 sync 마다 신규
+  # 리소스로 인식하지 않고 SSA 로 정상 갱신한다. data 크기가 256KB 를 넘는
+  # 대시보드에서 client-side apply 의 last-applied-configuration annotation
+  # 크기 제한 위반을 피하기 위함. Grafana sidecar 가 label 감시로 reload
+  # 하므로 hash 없어도 변경 감지는 정상 동작.
+  disableNameSuffixHash: true
   labels:
     app.kubernetes.io/name: grafana
     app.kubernetes.io/part-of: homelab
