@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cert-manager
+
+# multi-source ArgoCD Application pattern:
+#   spec.sources[0] = jetstack Helm chart (values = $values/manifests/infra/cert-manager/values.yaml)
+#   spec.sources[1] = 이 디렉토리 (path = manifests/infra/cert-manager, ref = values)
+# Helm chart 는 argocd 측에서 렌더되므로 이 Kustomization 은 overlay 리소스만 담는다.
+resources:
+  - namespace.yaml
+  # Phase 8 에서 ClusterIssuer 추가 예정

@@ -1,0 +1,56 @@
+# cert-manager v1.20.2 Helm values
+#
+# Phase 1 (CNPG migration): CNPG plugin-barman-cloud 의 gRPC mTLS 인증서를
+# 자동 발급·회전하기 위한 전제 컴포넌트. ClusterIssuer 는 Phase 8 에 도입 예정
+# 이므로 이 Phase 에서는 controller + webhook + cainjector 만 설치.
+#
+# Phase 0 I-2 pin: v1.20.2
+# Phase 0 I-2a 발견: chart v1.15+ 부터 installCRDs 는 deprecated, crds.enabled 로 전환.
+# v1.20 values schema 덤프 (`_workspace/cnpg-migration/08_certmanager-chart-values.yaml`) 확인.
+
+crds:
+  enabled: true    # chart 가 CRD 함께 설치
+  keep: true       # helm uninstall 시 CRD 잔존 (PV 유사 안전장치 · 기존 Certificate/Issuer 보존)
+
+# controller
+replicaCount: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# webhook
+webhook:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# cainjector
+cainjector:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# Prometheus 메트릭 노출 (chart default true). Alloy 는 로그 전용, 메트릭은 VM 이
+# prometheus.io/scrape annotation 기반 auto-discovery 하므로 Service/Pod 에 annotation
+# 이 자동으로 붙는지는 chart 기본 동작 확인 후 Phase 5 에서 추가 검증 예정.
+# podMonitor / serviceMonitor 는 미도입 (홈랩에 Prometheus operator 없음).
+prometheus:
+  enabled: true
+  servicemonitor:
+    enabled: false
+  podmonitor:
+    enabled: false
