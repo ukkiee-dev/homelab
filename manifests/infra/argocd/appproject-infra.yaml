@@ -27,6 +27,16 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: argocd
       server: https://kubernetes.default.svc
+    # scheduling application 이 전역 ResourceQuota/LimitRange 를 각 워크로드
+    # 네임스페이스에 배포하기 위해 destinations 확장. apps/monitoring/test-web
+    # 네임스페이스의 정책만 `infra` project 가 소유한다 — 실제 앱 배포는
+    # 각각 apps/monitoring project 에서 수행된다.
+    - namespace: apps
+      server: https://kubernetes.default.svc
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+    - namespace: test-web
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
@@ -50,3 +60,14 @@ spec:
       kind: ValidatingWebhookConfiguration
     - group: ""
       kind: ResourceQuota
+    # tailscale-operator 가 배포하는 cluster-scoped CR
+    - group: tailscale.com
+      kind: ProxyClass
+    - group: tailscale.com
+      kind: Connector
+    - group: tailscale.com
+      kind: DNSConfig
+    - group: tailscale.com
+      kind: ProxyGroup
+    - group: tailscale.com
+      kind: Recorder
