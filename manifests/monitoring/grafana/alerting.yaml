@@ -1211,7 +1211,7 @@ data:
             labels:
               severity: warning
             annotations:
-              summary: "Kubelet: 노드 {{ $labels.node }} MemoryPressure=true"
+              summary: "노드 {{ $labels.node }} MemoryPressure=true (kubelet) — eviction 임박"
               dashboardUid: "k8s-nodes"
               panelId: "3"
 
@@ -1258,7 +1258,7 @@ data:
             labels:
               severity: warning
             annotations:
-              summary: "Kubelet: 노드 {{ $labels.node }} DiskPressure=true"
+              summary: "노드 {{ $labels.node }} DiskPressure=true (kubelet) — image GC 임박"
               dashboardUid: "k8s-nodes"
               panelId: "33"
 
