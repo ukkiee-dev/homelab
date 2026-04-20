@@ -865,17 +865,15 @@ runs:
         r2-secret-access-key: ${{ inputs.r2-secret-access-key }}
         homelab-path:         _homelab
 
-    - name: Update ArgoCD Application for DB common/
+    - name: Update ArgoCD Application for DB common/ + ignoreDifferences
       if: inputs.database-enabled == 'true' && inputs.service-name != '' && inputs.database-mode == 'owner'
       shell: bash
       env:
         APP: ${{ inputs.app-name }}
       run: |
         set -euo pipefail
-        # database composite 가 manifests/apps/<app>/common/ 을 생성함.
-        # 기존 monorepo ArgoCD Application 은 이미 path=manifests/apps/<app> 이고
-        # 루트 kustomization 이 common/ 을 참조하도록 composite 가 관리.
-        # 추가 작업 없이 root kustomization 에 common/ 추가 확인.
+
+        # 1. database composite 가 manifests/apps/<app>/common/ 을 생성 → 루트 kustomization 에 common/ 추가
         ROOT_KUST="_homelab/manifests/apps/$APP/kustomization.yaml"
         if [ -f "$ROOT_KUST" ]; then
           if ! yq eval '.resources[]' "$ROOT_KUST" | grep -qx "common"; then
@@ -884,6 +882,40 @@ runs:
           else
             echo "⏭️  root kustomization 에 common/ 이미 존재"
           fi
+        fi
+
+        # 2. ArgoCD Application 에 CNPG Cluster ignoreDifferences 추가 (Phase 6 pokopia-wiki 드리프트 교훈, PR #14/#15)
+        #    CNPG operator 가 Cluster spec 에 default 값 자동 채움 → ArgoCD OutOfSync 영구.
+        #    managedFieldsManagers 는 managedFields=null 이라 무효 → jsonPointers/jqPathExpressions 로 개별 경로.
+        APP_FILE="_homelab/argocd/applications/apps/$APP.yaml"
+        if [ -f "$APP_FILE" ]; then
+          CLUSTER_NAME="${APP}-pg"
+          APP_NS="$APP" CLUSTER_NAME="$CLUSTER_NAME" yq eval -i '
+            .spec.ignoreDifferences = ((.spec.ignoreDifferences // []) + [{
+              "group": "postgresql.cnpg.io",
+              "kind": "Cluster",
+              "name": env(CLUSTER_NAME),
+              "namespace": env(APP_NS),
+              "jsonPointers": [
+                "/spec/affinity",
+                "/spec/bootstrap",
+                "/spec/enablePDB",
+                "/spec/enableSuperuserAccess",
+                "/spec/failoverDelay",
+                "/spec/logLevel",
+                "/spec/maxSyncReplicas",
+                "/spec/minSyncReplicas"
+              ],
+              "jqPathExpressions": [
+                ".spec.managed.roles[].connectionLimit",
+                ".spec.managed.roles[].inherit",
+                ".spec.monitoring.customQueriesConfigMap",
+                ".spec.monitoring.disableDefaultQueries",
+                ".spec.plugins[].enabled"
+              ]
+            }] | unique_by(.kind + "/" + .name))
+          ' "$APP_FILE"
+          echo "✅ ArgoCD Application 에 CNPG Cluster ignoreDifferences 추가"
         fi
 
     # ── Step 4: git commit & push (terraform 완료 후) ─────────────
