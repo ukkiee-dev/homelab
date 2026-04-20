@@ -142,14 +142,22 @@ kubectl -n "$RESTORE_NS" exec "$RESTORE_PRIMARY" -c postgres -- pg_dump -U postg
 - **TARGET_TIME 선택**: 너무 오래된 시점은 base backup retentionPolicy(14d) 로 이미 삭제된 구간. `kubectl cnpg status` 의 `FirstRecoverabilityPoint` 이후 시점만 가능
 - **시간 소요**: DB 크기·WAL 개수 비례. 홈랩 소규모 기준 5-15분 예상 (Phase 4 드라이런 실측값은 Phase 9 에 박제)
 
-## Phase 4 드라이런 실측값 (Phase 9 에서 채움)
+## Phase 4 드라이런 실측값 (추정, Task 4.6b skip)
 
-| 항목 | 값 |
+동일 메커니즘 (bootstrap.recovery + externalClusters plugin) 이 Task 4.6a 에서 검증됨. 별도 namespace 는 SealedSecret re-seal 만 추가 차이로 실측 skip. 실 DR 수행 시 참고값:
+
+| 항목 | 값 (Task 4.6a 기준 추정) |
 |---|---|
-| base backup 크기 | <TBD MB> |
-| WAL 개수 | <TBD segments> |
-| recovery 완료 소요 | <TBD min> |
-| verify 쿼리 응답 시간 | <TBD ms> |
+| base backup 크기 (5MB DB 기준) | ~5.2 MB |
+| WAL 개수 (marker 포함) | 4 segments |
+| recovery 완료 소요 | ~2-3분 |
+| SealedSecret re-seal 추가 소요 | +10-20초 |
+
+## ⚠️ serverName 충돌 주의 (cnpg-pitr-restore.md 동일 이슈)
+
+별도 namespace 라도 **같은 R2 bucket + 같은 barmanObjectName** 을 사용하면 recovery Cluster 에 `spec.plugins` 포함 시 "Expected empty archive" 에러 발생.
+
+**해결**: 이 Runbook 의 Step 2 예시 YAML 처럼 `spec.plugins` 블록 **제외** 가 기본. 이 Cluster 는 복구용 read-only 이므로 WAL archive 불필요 (주기 DR 검증 용도). 장기 보관 필요 시 별도 ObjectStore + 다른 serverName 지정.
 
 ## 참고
 
