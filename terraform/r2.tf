@@ -15,8 +15,11 @@ resource "cloudflare_r2_bucket_lifecycle" "postgresql_backup" {
   account_id  = var.account_id
   bucket_name = cloudflare_r2_bucket.postgresql_backup.name
 
+  # NOTE: rule 순서는 Cloudflare R2 API 가 id 알파벳 오름차순으로 반환하는 것에 맞춤.
+  # 논리적 순서(daily→weekly→monthly)로 두면 매 terraform plan 마다 drift 로 잡혀 false positive.
+  # 세 rule 은 prefix 가 서로 독립이라 평가 순서는 동작에 영향 없음.
   rules = [
-    # Rule 1: daily/ prefix — 7일 후 자동 삭제 (7 * 86400 = 604800초)
+    # daily/ prefix — 7일 후 자동 삭제 (7 * 86400 = 604800초)
     {
       id      = "expire-daily-7d"
       enabled = true
@@ -30,21 +33,7 @@ resource "cloudflare_r2_bucket_lifecycle" "postgresql_backup" {
         }
       }
     },
-    # Rule 2: weekly/ prefix — 28일 후 자동 삭제 (28 * 86400 = 2419200초)
-    {
-      id      = "expire-weekly-28d"
-      enabled = true
-      conditions = {
-        prefix = "weekly/"
-      }
-      delete_objects_transition = {
-        condition = {
-          type    = "Age"
-          max_age = 2419200
-        }
-      }
-    },
-    # Rule 3: monthly/ prefix — 180일 후 자동 삭제 (180 * 86400 = 15552000초)
+    # monthly/ prefix — 180일 후 자동 삭제 (180 * 86400 = 15552000초)
     {
       id      = "expire-monthly-180d"
       enabled = true
@@ -55,6 +44,20 @@ resource "cloudflare_r2_bucket_lifecycle" "postgresql_backup" {
         condition = {
           type    = "Age"
           max_age = 15552000
+        }
+      }
+    },
+    # weekly/ prefix — 28일 후 자동 삭제 (28 * 86400 = 2419200초)
+    {
+      id      = "expire-weekly-28d"
+      enabled = true
+      conditions = {
+        prefix = "weekly/"
+      }
+      delete_objects_transition = {
+        condition = {
+          type    = "Age"
+          max_age = 2419200
         }
       }
     }
