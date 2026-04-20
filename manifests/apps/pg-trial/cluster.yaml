@@ -1,0 +1,58 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-trial-pg
+  namespace: pg-trial
+  labels:
+    app.kubernetes.io/name: pg-trial-pg
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: pg-trial
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.13-standard-trixie
+  primaryUpdateStrategy: unsupervised
+
+  storage:
+    size: 5Gi
+    storageClass: local-path
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  monitoring:
+    enablePodMonitor: false
+
+  # Phase 0 I-2a 발견: Cluster 는 Pod 에 inheritedMetadata 로 annotation 전파.
+  # VM kubernetes-pods scrape 가 prometheus.io/scrape=true annotation 기반 auto-discovery 하므로
+  # Pod 에 scrape annotation 이 부여된다 (Phase 5 에서 VM 저장 검증 예정).
+  inheritedMetadata:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9187"
+      prometheus.io/path: "/metrics"
+
+  # PG GUC (design §D15 M3): memory limit 512Mi PoC 기준 축소 설정.
+  # 실 프로젝트 (1Gi limit) 에서는 design §D15 Postgres GUC 튜닝 값 사용.
+  postgresql:
+    parameters:
+      shared_buffers: "128MB"
+      work_mem: "4MB"
+      max_connections: "50"
+      maintenance_work_mem: "32MB"
+      effective_cache_size: "256MB"
+      wal_buffers: "8MB"
+      log_min_duration_statement: "250ms"
+      log_checkpoints: "on"
+
+  managed:
+    roles:
+      - name: demo
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-trial-pg-demo-credentials

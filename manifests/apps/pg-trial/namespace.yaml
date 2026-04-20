@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pg-trial
+  labels:
+    app.kubernetes.io/name: pg-trial
+    app.kubernetes.io/component: cnpg-poc
+    app.kubernetes.io/part-of: cnpg-migration
+    app.kubernetes.io/managed-by: kubectl
