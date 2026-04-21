@@ -100,10 +100,18 @@ gh search code 'ukkiee-dev/homelab/.github/workflows/_create-app.yml@main' --own
 
 ### 성공 기준
 
-- [ ] `_create-app.yml` required 입력 = `[app-name, config-yaml]`, 선택 = `[service-name, subdomain]` (총 4개)
-- [ ] `setup-app/action.yml` inputs 에서 type/port/health/icon/description/database-* 모두 삭제됨
-- [ ] Parse config step 에 `if [ -z "$CONFIG_YAML" ]` 시 error + exit (fallback 없음)
-- [ ] 기존 배포된 앱 (adguard, homepage, uptime-kuma, postgresql, pokopia-wiki) 무영향 (caller 경로를 통해서만 setup-app 실행됨 — manifests 는 이미 생성된 상태)
+- [x] `_create-app.yml` required 입력 = `[app-name, config-yaml]`, 선택 = `[service-name, subdomain]` (총 4개)
+- [x] `setup-app/action.yml` inputs 에서 type/port/health/icon/description/database-* 모두 삭제됨
+- [x] Parse config step 에 `if [ -z "$CONFIG_YAML" ]` 시 error + exit (fallback 없음)
+- [x] 기존 배포된 앱 (adguard, homepage, uptime-kuma, postgresql, pokopia-wiki) 무영향 (caller 경로를 통해서만 setup-app 실행됨 — manifests 는 이미 생성된 상태)
+
+### 결과 (2026-04-22 실행)
+
+- **Case A 확정**: 2026-04-22 세션에서 재검증 — `ukkiee-dev/pokopia-wiki` GitHub 레포 404 (조직에 부재, private 포함 전수 조사 결과 `homelab + app-starter` 2개만 존재). `gh search code` 로도 `_create-app.yml` 호출 caller 추가 발견 없음. 로컬 `/Users/ukyi/workspace/pokopia-wiki/` 에는 `create-app.yml` 이 있으나 remote 미설정으로 호출 자체 불가 → Phase 3b 안전 실행.
+- **제거된 입력 (11개)**: `_create-app.yml` 에서 `app-type`, `app-health`, `default-icon`, `database-enabled`, `database-mode`, `database-name`, `database-role`, `database-ref`, `database-storage`, `database-pg-image-tag` + "Fetch description from GitHub repo" step (setup-app 내부 Parse config 에서 동일 로직 수행).
+- **setup-app 에서 추가 제거**: `type`, `port`, `health`, `icon`, `description`, `database-enabled`, `database-mode`, `database-name`, `database-role`, `database-ref`, `database-storage`, `database-pg-image-tag` + Parse config hybrid fallback (else 블록).
+- **database composite 호출 변경**: `role-name: ""` (빈 값 → composite 가 `service-name|app-name` 기반 기본값 사용), `pg-image-tag` 생략 (composite default `16.13-standard-trixie` 사용, Renovate 추적).
+- **검증**: `actionlint .github/workflows/_create-app.yml` → 0 errors, `yq` 로 inputs 수 일치 확인.
 
 ### 예상 소요
 
