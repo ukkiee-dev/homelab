@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: ""
+      config-yaml:
+        description: "Phase 7: .app-config.yml 내용 (caller 가 전달). 비면 database immutability guard skip — backwards-compatible."
+        required: false
+        type: string
+        default: ""
     secrets:
       APP_ID:
         required: true
@@ -51,6 +56,61 @@ jobs:
 
       - name: Install yq
         uses: mikefarah/yq@v4
+
+      # Phase 7 M1: database 블록 immutability guard.
+      # caller 가 config-yaml 전달한 경우에만 동작. 현재 매니페스트 (common/database-shared.yaml)
+      # 의 spec.name 과 .app-config.yml 의 database.name 이 불일치하면 ::error:: + exit 1.
+      # 이유: DB 이름 변경은 자동 마이그레이션 불가 (pg_dump/restore 필요).
+      - name: Detect database block drift (immutability guard)
+        if: inputs.config-yaml != ''
+        env:
+          APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service }}
+          CONFIG_YAML: ${{ inputs.config-yaml }}
+        run: |
+          set -euo pipefail
+
+          CONFIG_FILE=$(mktemp)
+          printf '%s\n' "$CONFIG_YAML" > "$CONFIG_FILE"
+          DB_NAME=$(yq '.database.name // ""' "$CONFIG_FILE")
+          DB_REF=$(yq '.database.ref // ""' "$CONFIG_FILE")
+          rm -f "$CONFIG_FILE"
+
+          # 현재 매니페스트의 DB 설정 조회 (owner 공유 DB 패턴)
+          SHARED_FILE="manifests/apps/${APP}/common/database-shared.yaml"
+          CURRENT_DB=""
+          CURRENT_OWNER=""
+          if [ -f "$SHARED_FILE" ]; then
+            CURRENT_DB=$(yq '.spec.name // ""' "$SHARED_FILE")
+            CURRENT_OWNER=$(yq '.spec.owner // ""' "$SHARED_FILE")
+          fi
+
+          # Case 1: owner 서비스 (database.name) drift 검증
+          if [ -n "$DB_NAME" ] && [ -n "$CURRENT_DB" ] && [ "$DB_NAME" != "$CURRENT_DB" ]; then
+            echo "::error::database.name 변경 감지: '$CURRENT_DB' → '$DB_NAME'"
+            echo "::error::DB 이름 변경은 자동 마이그레이션 불가. 다음 절차 사용:"
+            echo "::error::  1. (옵션) 기존 DB pg_dump → 새 DB 복원"
+            echo "::error::  2. teardown 후 새 .app-config.yml 로 create-app 재실행"
+            echo "::error::  3. Runbook docs/runbooks/postgresql/cnpg-new-project.md 참조"
+            exit 1
+          fi
+
+          # Case 2: reference 서비스 (database.ref) — owner 디렉토리 존재 확인만
+          #         (ref 값 변경은 env 다시 주입 받는 것이 아니라 setup-app 재실행 필요)
+          if [ -n "$DB_REF" ]; then
+            REF_DIR="manifests/apps/${APP}/services/${DB_REF}"
+            if [ ! -d "$REF_DIR" ]; then
+              echo "::error::database.ref 참조 대상 서비스 없음: ${DB_REF}"
+              echo "::error::같은 project 내 owner 서비스를 먼저 생성하거나 database.ref 값을 확인하세요"
+              exit 1
+            fi
+          fi
+
+          if [ -n "$DB_NAME" ] || [ -n "$DB_REF" ]; then
+            echo "OK database 블록 drift 없음 (db-name=$DB_NAME db-ref=$DB_REF current=$CURRENT_DB)"
+          else
+            echo "OK database 블록 없음"
+          fi
 
       - name: Update manifests
         env:
