@@ -241,6 +241,34 @@ jobs:
       - name: Install yq
         uses: mikefarah/yq@v4
 
+      # ── Step 2.9: CNPG DB 있던 앱 감지 (매니페스트 제거 전에 실행) ──
+      # common/database-shared.yaml 또는 cluster.yaml 존재 여부로 판단.
+      # R2 backup prefix 는 ObjectStore retentionPolicy (7d) 로 자동 만료 안내.
+      - name: Notify CNPG backup retention
+        id: cnpg
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+          MODE: ${{ steps.remove.outputs.mode }}
+        run: |
+          set -euo pipefail
+          APP="$APP_NAME"
+          PROJECT_DIR="manifests/apps/$APP"
+
+          HAD_DB=false
+          if [ -f "$PROJECT_DIR/common/database-shared.yaml" ] || [ -f "$PROJECT_DIR/common/cluster.yaml" ]; then
+            HAD_DB=true
+          fi
+
+          # service 모드는 project 전체가 남으므로 R2 안내 불필요.
+          if [ "$HAD_DB" = "true" ] && [ "$MODE" != "service" ]; then
+            echo "::notice title=CNPG R2 backup::app=${APP} 의 CNPG Cluster 매니페스트가 제거됩니다."
+            echo "::notice::R2 backup prefix 'homelab-db-backups/${APP}-pg/' 는 ObjectStore retentionPolicy (7d) 로 자동 만료."
+            echo "::notice::즉시 삭제 필요 시: aws s3 rm s3://homelab-db-backups/${APP}-pg/ --recursive"
+            echo "::notice::PITR 복구용 점검은 runbooks/postgresql/cnpg-dr-new-namespace.md 참조."
+          fi
+
+          echo "had-database=$HAD_DB" >> "$GITHUB_OUTPUT"
+
       # ── Step 3: 매니페스트 제거 (mode별 분기) ──────────────────
       - name: Remove manifests & ArgoCD Application
         env:

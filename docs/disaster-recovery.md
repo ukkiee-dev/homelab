@@ -30,9 +30,8 @@
 | AdGuard Home | Kustomize | apps | PVC (설정 + 필터) |
 | Uptime Kuma | Kustomize | apps | PVC (모니터링 설정) |
 | PostgreSQL (Bitnami, 폐기 예정 Phase 8) | Helm | apps | PVC + CronJob pg_dump 백업 |
-| CNPG Clusters (프로젝트별) | Kustomize | `<project>` | PVC (local-path) + R2 Barman archive (지속) |
+| CNPG Clusters (프로젝트별) | Kustomize | `<project>` | PVC (local-path) + R2 Barman archive (지속). 선언: 앱 레포 `services/<svc>/.app-config.yml.database` (Phase 2+) |
 | pokopia-wiki | Kustomize | pokopia-wiki | CNPG Cluster + Database + ObjectStore |
-| Test Web | Kustomize | test-web | - (CI/CD 테스트용) |
 
 ### Monitoring (monitoring/)
 
