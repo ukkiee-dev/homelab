@@ -591,6 +591,10 @@ data:
 
           - uid: argocd-app-out-of-sync
             title: ArgoCD OutOfSync 지속
+            # 2026-04-21 incident: test-phase7c 처럼 즉시 생성 → 즉시 teardown 되는 테스트 앱은
+            # 이미지/매니페스트 drift 로 순간 OutOfSync 상태가 되며 실제 장애가 아니다.
+            # namespace 가 생성된 지 1시간 경과한 Application 만 대상으로 하여 new-namespace grace period
+            # 적용. root (dest_namespace=argocd) 는 argocd ns 가 오래되어 정상 알람 대상.
             condition: C
             data:
               - refId: A
@@ -599,7 +603,7 @@ data:
                   to: 0
                 datasourceUid: victoriametrics
                 model:
-                  expr: argocd_app_info{sync_status="OutOfSync"} > 0
+                  expr: argocd_app_info{sync_status="OutOfSync"} * on(dest_namespace) group_left() label_replace(time() - kube_namespace_created > 3600, "dest_namespace", "$1", "namespace", "(.+)") > 0
                   instant: true
                   refId: A
               - refId: B
@@ -638,6 +642,9 @@ data:
 
           - uid: argocd-app-degraded
             title: ArgoCD Application Degraded
+            # 2026-04-21 incident: test-phase7c 처럼 이미지 없이 배포된 테스트 앱은 ArgoCD sync
+            # 직후 Degraded 로 전환된다. 테스트 목적으로 곧 teardown 되므로 실제 장애가 아님.
+            # namespace 생성 후 1시간 경과한 Application 만 대상 (new-namespace grace period).
             condition: C
             data:
               - refId: A
@@ -646,7 +653,7 @@ data:
                   to: 0
                 datasourceUid: victoriametrics
                 model:
-                  expr: argocd_app_info{health_status="Degraded"} > 0
+                  expr: argocd_app_info{health_status="Degraded"} * on(dest_namespace) group_left() label_replace(time() - kube_namespace_created > 3600, "dest_namespace", "$1", "namespace", "(.+)") > 0
                   instant: true
                   refId: A
               - refId: B
