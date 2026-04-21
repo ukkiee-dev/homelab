@@ -32,7 +32,6 @@ jobs:
       R2_ACCESS_KEY_ID:    ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       TF_DOMAIN:           ${{ secrets.TF_DOMAIN }}
-      ARGOCD_AUTH_TOKEN:   ${{ secrets.ARGOCD_AUTH_TOKEN }}
 
   notify-success:
     needs: teardown

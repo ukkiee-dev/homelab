@@ -20,9 +20,14 @@ spec:
     server: https://kubernetes.default.svc
     namespace: argocd
   syncPolicy:
+    # GitOps-native teardown: git 에서 argocd/applications/apps/<app>.yaml 삭제 시
+    # root app 이 prune 으로 live Application CR 제거 → Application 의
+    # resources-finalizer.argocd.argoproj.io 가 cascade 로 namespace·Deployment·Cluster 등 정리.
+    # 이 전환은 _teardown.yml 이 외부 ArgoCD REST API 에 의존하던 구조적 문제를 해소한다
+    # (GHA runner → argo.ukkiee.dev curl timeout incident, 2026-04-22).
     automated:
       selfHeal: true
-      prune: false
+      prune: true
     retry:
       limit: 3
       backoff:
