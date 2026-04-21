@@ -141,6 +141,8 @@ runs:
     - name: Create manifests
       if: ${{ (steps.tunnel.outcome == 'success' || inputs.type == 'worker') && inputs.service-name == '' }}
       shell: bash
+      env:
+        APP_TOKEN: ${{ inputs.app-token }}
       run: |
         set -euo pipefail
         APP="${{ inputs.app-name }}"
@@ -186,6 +188,22 @@ runs:
 
         mkdir -p _homelab/manifests/apps/$APP
 
+        # ── GHCR image pre-flight: initial replicas 결정 ──
+        # 2026-04-21 test-phase7c incident 대응: 이미지 없이 replicas=1 로 배포하면
+        # ArgoCD sync 직후 ImagePullBackOff 로 알람 노이즈 + 고아 Pod/ReplicaSet 생성.
+        # 이미지 있으면 1, 없으면 0 으로 초기화. 첫 _update-image 호출 때 0->1 bump 된다.
+        IMG_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          -H "Authorization: Bearer $APP_TOKEN" \
+          "https://api.github.com/orgs/ukkiee-dev/packages/container/${APP}")
+        if [ "$IMG_STATUS" = "200" ]; then
+          INITIAL_REPLICAS=1
+          echo "OK  GHCR 이미지 확인 (${APP}) -> replicas=1 초기 배포"
+        else
+          INITIAL_REPLICAS=0
+          echo "::warning::GHCR 이미지 미존재 (${APP}, HTTP ${IMG_STATUS}) -> replicas=0 초기 배포"
+          echo "  첫 build workflow 가 _update-image 를 호출하면 replicas 0->1 로 자동 bump"
+        fi
+
         # GHCR pull secret (SealedSecret) — namespace만 교체
         sed "s/__NAMESPACE__/$APP/g" \
           _homelab/.github/templates/ghcr-pull-secret.sealed.yaml \
@@ -204,7 +222,7 @@ runs:
             app.kubernetes.io/managed-by: argocd
         spec:
           revisionHistoryLimit: 3
-          replicas: 1
+          replicas: $INITIAL_REPLICAS
           selector:
             matchLabels:
               app.kubernetes.io/name: $APP
@@ -440,6 +458,7 @@ runs:
         ICON_IN: ${{ inputs.icon }}
         DESCRIPTION_IN: ${{ inputs.description }}
         HEALTH_IN: ${{ inputs.health }}
+        APP_TOKEN: ${{ inputs.app-token }}
       run: |
         set -euo pipefail
         ICON="${ICON_IN:-mdi-application}"
@@ -544,6 +563,21 @@ runs:
         # ── services/<svc>/ ──────────────────────────────────
         mkdir -p "$SVC_DIR"
 
+        # ── GHCR image pre-flight: initial replicas 결정 ──
+        # 2026-04-21 test-phase7c incident 대응. 이미지명은 ${APP}-${SERVICE} 패턴.
+        IMG_PKG="${APP}-${SERVICE}"
+        IMG_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          -H "Authorization: Bearer $APP_TOKEN" \
+          "https://api.github.com/orgs/ukkiee-dev/packages/container/${IMG_PKG}")
+        if [ "$IMG_STATUS" = "200" ]; then
+          INITIAL_REPLICAS=1
+          echo "OK  GHCR 이미지 확인 (${IMG_PKG}) -> replicas=1 초기 배포"
+        else
+          INITIAL_REPLICAS=0
+          echo "::warning::GHCR 이미지 미존재 (${IMG_PKG}, HTTP ${IMG_STATUS}) -> replicas=0 초기 배포"
+          echo "  첫 build workflow 가 _update-image 를 호출하면 replicas 0->1 로 자동 bump"
+        fi
+
         cat > "$SVC_DIR/deployment.yaml" << EOF
         apiVersion: apps/v1
         kind: Deployment
@@ -558,7 +592,7 @@ runs:
             app.kubernetes.io/managed-by: argocd
         spec:
           revisionHistoryLimit: 3
-          replicas: 1
+          replicas: $INITIAL_REPLICAS
           selector:
             matchLabels:
               app.kubernetes.io/name: $SERVICE
