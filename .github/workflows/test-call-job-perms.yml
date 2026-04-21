@@ -1,0 +1,8 @@
+name: Test Call Job Perms
+on:
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_test-job-perms.yml
+    with:
+      app-name: x

@@ -1,0 +1,12 @@
+name: Test Job Perms
+on:
+  workflow_call:
+    inputs:
+      app-name: { required: true, type: string }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: echo "${{ inputs.app-name }}"
