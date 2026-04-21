@@ -39,8 +39,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: monitoring
       server: https://kubernetes.default.svc
-    - namespace: test-web
-      server: https://kubernetes.default.svc
     # Phase 1 (CNPG migration): cert-manager 전용 namespace
     - namespace: cert-manager
       server: https://kubernetes.default.svc

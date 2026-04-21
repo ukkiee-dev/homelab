@@ -14,8 +14,6 @@ spec:
   destinations:
     - namespace: apps
       server: https://kubernetes.default.svc
-    - namespace: test-web
-      server: https://kubernetes.default.svc
     # Phase 6 (CNPG migration): 첫 CNPG 실 프로젝트 (리뷰 H1 반영)
     - namespace: pokopia-wiki
       server: https://kubernetes.default.svc
