@@ -1,0 +1,48 @@
+name: Add Database (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        required: true
+        type: string
+      service-name:
+        description: "모노레포 서비스 이름 (services/<name>)"
+        required: true
+        type: string
+      config-yaml:
+        description: ".app-config.yml 내용 (caller 가 읽어 전달)"
+        required: true
+        type: string
+    secrets:
+      APP_ID: { required: true }
+      APP_PRIVATE_KEY: { required: true }
+      TF_ACCOUNT_ID: { required: true }
+      R2_ACCESS_KEY_ID: { required: true }
+      R2_SECRET_ACCESS_KEY: { required: true }
+      TELEGRAM_BOT_TOKEN: { required: false }
+      TELEGRAM_CHAT_ID: { required: false }
+
+jobs:
+  add-database:
+    runs-on: ubuntu-latest
+    # NOTE: caller workflow 에 permissions 상속. 이 파일에는 permissions 블록 금지
+    #       (feedback_workflow_call_permissions.md — reusable startup_failure 방지).
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ukkiee-dev
+          repositories: homelab
+
+      - name: Checkout homelab
+        uses: actions/checkout@v4
+        with:
+          repository: ukkiee-dev/homelab
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Install yq
+        uses: mikefarah/yq@v4
