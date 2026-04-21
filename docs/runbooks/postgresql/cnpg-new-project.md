@@ -135,17 +135,53 @@ kubectl -n "$NS" run r2-check --rm -i --restart=Never --image=amazon/aws-cli:lat
 
 ## 시나리오 A: 기존 앱에 DB 추가
 
-기존 monorepo 앱 (`service-name` 구조) 에 DB 만 추가하려면:
+> **2026-04-21 자동화 완료**: app-starter `add-database.yml` + homelab `_add-database.yml` 로 자동 처리.
+> 설계: [`plans/2026-04-21-add-database-workflow-design.md`](../../plans/2026-04-21-add-database-workflow-design.md)
 
-```
-Actions → Sync App Config → Run workflow  (미지원)
-```
+기존 배포된 서비스에 DB 만 추가하려면 (teardown + create-app 재실행 필요 없음):
 
-**현재는 자동화 미지원**. 수동 경로:
-1. `manifests/apps/<app>/common/` 디렉토리 생성
-2. [시나리오 C](#시나리오-c-수동-템플릿-복사) 의 템플릿 수동 복사
-3. 앱 레포 `.app-config.yml` 에 `database.enabled: true` 추가 (향후 파서 확장 시 자동 처리)
-4. PR → merge
+### 절차
+
+1. 앱 레포 `services/<svc>/.app-config.yml` 에 `database` 블록 추가 + push
+
+   **owner (신규 DB 생성)**:
+   ```yaml
+   database:
+     name: mydb          # PostgreSQL identifier (소문자·숫자·_)
+     storage: 10Gi       # 선택 (기본 10Gi)
+   ```
+
+   **reference (기존 owner DB 공유, 같은 project 안)**:
+   ```yaml
+   database:
+     ref: api            # 같은 project 내 owner 서비스 이름
+   ```
+
+2. 앱 레포에서 dispatch:
+   ```bash
+   gh workflow run add-database.yml --repo ukkiee-dev/<app> -f service-name=<svc>
+   ```
+   또는 Actions UI → **Add Database** → Run workflow.
+
+### 자동 처리
+
+- Parse config → db-mode 판단 (owner/reference/none)
+- Validate — service 디렉토리 존재 확인, 멱등성 체크 (이미 동일 구성이면 skip), immutability guard (name/ref 변경 시도 차단)
+- owner: `setup-app/database@main` composite → Cluster + Database CR + role-secret 생성 → 루트 kustomization "common" 추가 → ArgoCD Application ignoreDifferences 추가
+- reference: composite reference 분기 → 해당 서비스 Deployment env 에 PG 5개 (PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD) 주입 → ArgoCD 자동 롤링
+- commit/push + Telegram 알림
+
+### 멱등성
+
+- 동일 config 로 재실행 → `::notice::이미 구성 완료` + git diff 비어있음 (안전)
+- `database.name` 또는 `database.ref` 변경 시도 → `::error::` + 마이그레이션 가이드 출력 (차단)
+- DB 이름 실제로 변경해야 하는 경우 → teardown → 새 `.app-config.yml` 로 create-app 재실행 (Runbook 하단 트러블슈팅 참조)
+
+### 제약
+
+- **모노레포 (service-name 필수)** 앱만 지원. flat 앱은 현재 DB 미지원
+- reference 모드는 **owner 서비스가 이미 배포 완료** 상태여야 함 (common/database-shared.yaml 존재 전제)
+- create-app 시점에 database 블록이 있었으면 이미 DB 가 있는 것이므로, add-database 는 skip (멱등) — 후속 DB 추가용
 
 ## 시나리오 C: 수동 템플릿 복사 (긴급·참조)
 
