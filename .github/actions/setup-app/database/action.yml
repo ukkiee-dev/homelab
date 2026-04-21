@@ -5,12 +5,10 @@ description: |
   role password 는 openssl 로 생성 → kubeseal 로 SealedSecret seal.
 
   시나리오:
-    - mode=owner     : managed.roles + role SealedSecret + Database CR 생성 (services/<svc>/database.yaml 또는 common/database-shared.yaml)
-    - mode=reference : Database CR 생성 안 함, env 는 owner 의 credentials 공유 (setup-app 상위 step 이 처리)
+    - mode=owner     : Cluster managed.roles + role SealedSecret + Database CR 생성 (common/database-shared.yaml 공유 패턴)
+    - mode=reference : owner 의 common/database-shared.yaml 에서 db·role 추출 후 reference 서비스 Deployment 에
+                       PG 표준 env 5개 (PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD) 주입. owner role-secret 을 secretKeyRef 로 재사용.
     - mode=none      : DB 관련 매니페스트 생성 안 함
-
-  Phase 7 초기 버전. 이번 composite 은 매니페스트 생성 뼈대만 담당. end-to-end 테스트는
-  `_create-app.yml` 통합 PR 이후 별도 검증.
 
 inputs:
   app-name:
@@ -269,6 +267,93 @@ runs:
         rm -f "$PLAIN"
 
         echo "✅ r2-backup SealedSecret seal 완료 (namespace=${APP})"
+
+    # ── Reference 모드: owner 서비스의 DB 를 공유 ───────────────
+    # validate-ref: owner 가 이미 setup 되어 common/database-shared.yaml 이 존재하는지 확인
+    # 후속 step 이 outputs.owner-db / outputs.owner-role 을 사용.
+    - name: Validate reference target exists (reference mode)
+      id: validate-ref
+      if: steps.guard.outputs.skip != 'true' && inputs.mode == 'reference'
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+        SERVICE: ${{ inputs.service-name }}
+        REF: ${{ inputs.ref-db }}
+        HOMELAB: ${{ inputs.homelab-path }}
+      run: |
+        set -euo pipefail
+        if [ -z "$REF" ]; then
+          echo "::error::mode=reference 시 ref-db 필수 (참조할 owner 서비스 이름)"
+          exit 1
+        fi
+        if [ -z "$SERVICE" ]; then
+          echo "::error::mode=reference 는 모노레포 service-name 필수 (reference 서비스의 Deployment 에 env 주입)"
+          exit 1
+        fi
+        # owner 서비스 디렉토리 존재 확인 (reference 가 owner 와 같은 모노레포 안에 있다는 가정)
+        REF_DIR="${HOMELAB}/manifests/apps/${APP}/services/${REF}"
+        if [ ! -d "$REF_DIR" ]; then
+          echo "::error::reference 대상 서비스 디렉토리 없음: $REF_DIR"
+          echo "::error::먼저 owner 서비스 (${REF}) 를 생성한 후 reference 서비스를 추가하세요."
+          exit 1
+        fi
+        # common/database-shared.yaml 에서 DB·role 정보 추출 (owner step 이 생성한 파일)
+        SHARED="${HOMELAB}/manifests/apps/${APP}/common/database-shared.yaml"
+        if [ ! -f "$SHARED" ]; then
+          echo "::error::common/database-shared.yaml 없음: $SHARED"
+          echo "::error::owner 서비스가 DB 셋업을 완료하지 않았거나 공유 DB 패턴이 아닙니다."
+          exit 1
+        fi
+        OWNER_DB=$(yq '.spec.name // ""' "$SHARED")
+        OWNER_ROLE=$(yq '.spec.owner // ""' "$SHARED")
+        if [ -z "$OWNER_DB" ] || [ -z "$OWNER_ROLE" ]; then
+          echo "::error::database-shared.yaml 에서 spec.name/spec.owner 추출 실패"
+          echo "  실제 값: name=[$OWNER_DB] owner=[$OWNER_ROLE]"
+          exit 1
+        fi
+        echo "owner-db=$OWNER_DB" >> "$GITHUB_OUTPUT"
+        echo "owner-role=$OWNER_ROLE" >> "$GITHUB_OUTPUT"
+        echo "✅ reference target 확인 — owner=${REF} db=${OWNER_DB} role=${OWNER_ROLE}"
+
+    # inject-env: reference 서비스 Deployment 에 PG 표준 env 5개 주입.
+    # libpq 자동 인식 이름 사용 (PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD) — 앱 코드에서
+    # DATABASE_URL 조합 없이도 psql/node-postgres/psycopg 등이 자동으로 env 참조.
+    # owner 의 role-secret (${APP}-pg-${OWNER_ROLE}-credentials) 은 이미 owner setup 시 sealed.
+    - name: Inject PG env into reference service Deployment
+      if: steps.guard.outputs.skip != 'true' && inputs.mode == 'reference'
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+        SERVICE: ${{ inputs.service-name }}
+        OWNER_DB: ${{ steps.validate-ref.outputs.owner-db }}
+        OWNER_ROLE: ${{ steps.validate-ref.outputs.owner-role }}
+        HOMELAB: ${{ inputs.homelab-path }}
+      run: |
+        set -euo pipefail
+        DEPLOYMENT="${HOMELAB}/manifests/apps/${APP}/services/${SERVICE}/deployment.yaml"
+        if [ ! -f "$DEPLOYMENT" ]; then
+          echo "::error::reference 서비스 Deployment 없음: $DEPLOYMENT"
+          exit 1
+        fi
+
+        SECRET_NAME="${APP}-pg-${OWNER_ROLE}-credentials"
+        PG_HOST="${APP}-pg-rw.${APP}.svc"
+
+        # idempotent: unique_by(.name) 로 재실행 시 중복 추가 방지
+        SECRET_NAME="$SECRET_NAME" PG_HOST="$PG_HOST" OWNER_DB="$OWNER_DB" OWNER_ROLE="$OWNER_ROLE" \
+        yq eval -i '
+          .spec.template.spec.containers[0].env = (
+            (.spec.template.spec.containers[0].env // []) + [
+              {"name": "PGHOST",     "value": env(PG_HOST)},
+              {"name": "PGPORT",     "value": "5432"},
+              {"name": "PGDATABASE", "value": env(OWNER_DB)},
+              {"name": "PGUSER",     "value": env(OWNER_ROLE)},
+              {"name": "PGPASSWORD", "valueFrom": {"secretKeyRef": {"name": env(SECRET_NAME), "key": "password"}}}
+            ]
+            | unique_by(.name)
+          )
+        ' "$DEPLOYMENT"
+        echo "✅ reference ${SERVICE} Deployment 에 PG env 5개 주입 (owner=${OWNER_ROLE} db=${OWNER_DB})"
 
     - name: Finalize
       id: finalize
