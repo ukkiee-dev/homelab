@@ -285,6 +285,32 @@ jobs:
             echo "ArgoCD Application yaml 유지 (service 모드)"
           fi
 
+      # -- Step 3b: AppProject destinations 제거 (setup-app Step 3d 의 역방향) --
+      # flat/project 모드 에서만 실행 (service 모드는 namespace 가 유지됨).
+      - name: Remove AppProject destinations
+        if: steps.remove.outputs.delete_application == 'true'
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+        run: |
+          set -euo pipefail
+          for proj_file in \
+            manifests/infra/argocd/appproject-apps.yaml \
+            manifests/infra/argocd/appproject-infra.yaml; do
+
+            if [ ! -f "$proj_file" ]; then
+              echo "WARNING  $proj_file 미존재, 스킵"
+              continue
+            fi
+
+            EXISTS=$(NS="$APP_NAME" yq '.spec.destinations | map(.namespace == env(NS)) | any' "$proj_file")
+            if [ "$EXISTS" = "true" ]; then
+              NS="$APP_NAME" yq eval -i '.spec.destinations |= map(select(.namespace != env(NS)))' "$proj_file"
+              echo "OK $(basename "$proj_file"): $APP_NAME destination 제거"
+            else
+              echo "SKIP $(basename "$proj_file"): $APP_NAME destination 없음"
+            fi
+          done
+
       - name: Commit & Push
         env:
           APP_NAME: ${{ inputs.app-name }}
