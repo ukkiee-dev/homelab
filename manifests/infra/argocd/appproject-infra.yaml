@@ -45,11 +45,6 @@ spec:
     # Phase 2 (CNPG migration): operator + plugin 전용 namespace
     - namespace: cnpg-system
       server: https://kubernetes.default.svc
-    # Phase 6 hotfix: scheduling Application (project=infra) 이 ResourceQuota/LimitRange 를
-    # 각 앱 namespace 에 배포한다. Phase 6 PR #10 에서 apps AppProject 에만 pokopia-wiki
-    # destination 을 추가했지만 infra 에도 필요 (scheduling 거부 방지).
-    - namespace: pokopia-wiki
-      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

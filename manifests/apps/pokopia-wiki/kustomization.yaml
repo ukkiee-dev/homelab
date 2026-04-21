@@ -1,8 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-# Phase 6 pokopia-wiki 는 common/ 만 포함 (DB 리소스).
-# 앱 Deployment 는 별도 레포 (ukkiee-dev/pokopia-wiki) 에서 향후 추가 예정.
-# 추가 시 이 목록에 services/api/ 등 포함.
-resources:
-  - common/
