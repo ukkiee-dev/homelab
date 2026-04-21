@@ -151,6 +151,46 @@ jobs:
             exit 1
           fi
 
+      # ── GHCR image pre-flight ──────────────────────────────
+      # 2026-04-21 test-phase7c incident 대응: 이미지 없이 매니페스트만 배포되면
+      # ArgoCD sync 직후 ImagePullBackOff 가 기본값이라 이후 teardown 까지 알람 노이즈
+      # + 진단 로그 오염을 발생시킨다. 실패가 아닌 경고로 처리한다 — 정상 흐름은
+      # `create-app → 레포 push → build workflow → image 생성` 이므로 이 시점에
+      # 이미지 없음이 에러는 아니다. 다만 사용자가 "테스트 스캐폴딩인지" vs "실제 앱 후속 push 예정" 인지
+      # 의식할 수 있도록 경고를 남긴다.
+      - name: Check GHCR image exists (pre-flight warning)
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+          SERVICE_NAME: ${{ inputs.service-name }}
+          TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # flat 앱         -> ghcr.io/ukkiee-dev/<app>
+          # 모노레포 서비스 -> ghcr.io/ukkiee-dev/<app>-<service>
+          if [ -z "$SERVICE_NAME" ]; then
+            PKG="$APP_NAME"
+          else
+            PKG="${APP_NAME}-${SERVICE_NAME}"
+          fi
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://api.github.com/orgs/ukkiee-dev/packages/container/${PKG}")
+
+          case "$STATUS" in
+            200)
+              echo "OK  GHCR 이미지 확인: ghcr.io/ukkiee-dev/${PKG}"
+              ;;
+            404)
+              echo "::warning::GHCR 이미지 미존재: ghcr.io/ukkiee-dev/${PKG}:latest"
+              echo "  매니페스트는 생성되지만 ArgoCD sync 직후 ImagePullBackOff 상태가 됩니다."
+              echo "  - 정식 앱: 이어서 레포에 코드 push -> build workflow 가 이미지 생성 후 자연 해소"
+              echo "  - 테스트 스캐폴딩: 즉시 teardown 권장 (알람 노이즈 및 고아 Application 위험)"
+              ;;
+            *)
+              echo "::warning::GHCR API 호출 이상 (HTTP ${STATUS}) -- 이미지 존재 여부 확인 실패, 계속 진행"
+              ;;
+          esac
+
       # ── Setup ──────────────────────────────────────────────
       - name: Resolve subdomain
         id: resolve
