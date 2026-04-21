@@ -194,7 +194,7 @@ jobs:
 
       # db-mode=owner → Cluster + Database CR + role-secret 생성
       - name: Setup CNPG database (owner)
-        if: steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'owner'
+        if: ${{ success() && steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'owner' }}
         uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
         with:
           app-name:             ${{ inputs.app-name }}
@@ -211,7 +211,7 @@ jobs:
 
       # db-mode=reference → 서비스 Deployment env 에 PG 5개 주입
       - name: Setup CNPG database (reference)
-        if: steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'reference'
+        if: ${{ success() && steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'reference' }}
         uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
         with:
           app-name:             ${{ inputs.app-name }}
@@ -228,7 +228,7 @@ jobs:
       # owner 생성 후: 루트 kustomization 에 "common" 추가 + ArgoCD Application 에
       # CNPG Cluster ignoreDifferences 추가. setup-app/action.yml 과 동일 로직.
       - name: Update ArgoCD Application for DB (owner post-processing)
-        if: steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'owner'
+        if: ${{ success() && steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'owner' }}
         shell: bash
         env:
           APP: ${{ inputs.app-name }}
@@ -279,7 +279,7 @@ jobs:
           fi
 
       - name: Commit & Push
-        if: steps.validate.outputs.skip != 'true'
+        if: ${{ success() && steps.validate.outputs.skip != 'true' }}
         shell: bash
         env:
           APP: ${{ inputs.app-name }}
@@ -306,7 +306,7 @@ jobs:
           fi
 
       - name: Push with retry
-        if: steps.validate.outputs.skip != 'true'
+        if: ${{ success() && steps.validate.outputs.skip != 'true' }}
         uses: ./.github/actions/git-push-retry
 
       # Telegram 알림 (선택)
@@ -321,5 +321,5 @@ jobs:
         run: |
           if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then exit 0; fi
           curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            -d chat_id="${TG_CHAT}" \
-            -d text="🗄️ DB 추가 완료 (${DB_MODE}): ${APP}/${SERVICE}"
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=🗄️ DB 추가 완료 (${DB_MODE}): ${APP}/${SERVICE}"
