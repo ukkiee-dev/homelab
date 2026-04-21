@@ -19,15 +19,17 @@ spec:
     # Phase 6 (CNPG migration): 첫 CNPG 실 프로젝트 (리뷰 H1 반영)
     - namespace: pokopia-wiki
       server: https://kubernetes.default.svc
+    - namespace: test-phase7c
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
     - group: ""
-      kind: PersistentVolume    # 외장 SSD 기반 hostPath PV (postgresql-backup)
+      kind: PersistentVolume # 외장 SSD 기반 hostPath PV (postgresql-backup)
     - group: scheduling.k8s.io
       kind: PriorityClass
     - group: storage.k8s.io
-      kind: StorageClass         # external-ssd StorageClass (no-provisioner, WaitForFirstConsumer)
+      kind: StorageClass # external-ssd StorageClass (no-provisioner, WaitForFirstConsumer)
     - group: rbac.authorization.k8s.io
       kind: ClusterRole
     - group: rbac.authorization.k8s.io

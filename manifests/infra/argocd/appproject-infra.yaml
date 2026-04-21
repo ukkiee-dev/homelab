@@ -52,6 +52,8 @@ spec:
     # destination 을 추가했지만 infra 에도 필요 (scheduling 거부 방지).
     - namespace: pokopia-wiki
       server: https://kubernetes.default.svc
+    - namespace: test-phase7c
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
@@ -91,7 +93,7 @@ spec:
     # ClusterIssuer 는 Phase 8 도입 예정이지만 사전 등재하여 나중에 whitelist 추가 PR 불필요.
     - group: cert-manager.io
       kind: ClusterIssuer
-    # Phase 2 (CNPG migration): CNPG operator + plugin-barman-cloud cluster-scoped 리소스는
-    # 기존 apiextensions.k8s.io/CustomResourceDefinition + rbac.authorization.k8s.io/ClusterRole+ClusterRoleBinding +
-    # admissionregistration.k8s.io/Validating+MutatingWebhookConfiguration whitelist 로 모두 커버.
-    # postgresql.cnpg.io/* · barmancloud.cnpg.io/* CR 은 namespace-scoped 로 apps AppProject 범위.
+  # Phase 2 (CNPG migration): CNPG operator + plugin-barman-cloud cluster-scoped 리소스는
+  # 기존 apiextensions.k8s.io/CustomResourceDefinition + rbac.authorization.k8s.io/ClusterRole+ClusterRoleBinding +
+  # admissionregistration.k8s.io/Validating+MutatingWebhookConfiguration whitelist 로 모두 커버.
+  # postgresql.cnpg.io/* · barmancloud.cnpg.io/* CR 은 namespace-scoped 로 apps AppProject 범위.

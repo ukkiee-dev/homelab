@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: test-phase7c
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: test-phase7c
+spec:
+  selector:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: test-phase7c
+  ports:
+    - port: 3000
+      targetPort: 3000
