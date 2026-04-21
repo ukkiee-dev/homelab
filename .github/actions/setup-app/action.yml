@@ -5,8 +5,7 @@ inputs:
   app-name:             { required: true }
   subdomain:            { required: false, default: "" }
   service-name:         { required: false, default: "",  description: "모노레포 서비스 이름. 비면 flat 앱(기존), 있으면 manifests/apps/<app>/services/<service>/ 경로로 생성." }
-  # Phase 2: caller 측 파싱 — .app-config.yml 내용 문자열. 비어있으면 deprecated inputs 로 fallback.
-  config-yaml:          { required: false, default: "",  description: ".app-config.yml 내용 (caller 가 읽어 전달). 비어있으면 deprecated inputs 로 fallback." }
+  config-yaml:          { required: true,                description: ".app-config.yml 내용 (caller 가 읽어 전달)." }
   app-token:            { required: true }
   tf-cloudflare-token:  { required: true }
   tf-zone-id:           { required: true }
@@ -15,19 +14,6 @@ inputs:
   r2-access-key-id:     { required: true }
   r2-secret-access-key: { required: true }
   domain:               { required: false, default: "ukkiee.dev" }
-  # ── Deprecated: Phase 3b 에서 제거. config-yaml 전달 시 모두 무시됨. ──
-  type:                 { required: false, default: "",      description: "(deprecated) .app-config.yml.type 으로 대체. config-yaml 비었을 때만 fallback 참조." }
-  port:                 { required: false, default: "0",     description: "(deprecated) type 기반 자동 매핑으로 대체됨. 값을 넘겨도 무시됨." }
-  health:               { required: false, default: "",      description: "(deprecated) .app-config.yml.health 로 대체." }
-  icon:                 { required: false, default: "",      description: "(deprecated) .app-config.yml.icon 으로 대체." }
-  description:          { required: false, default: "",      description: "(deprecated) .app-config.yml.description 으로 대체." }
-  database-enabled:       { required: false, default: "false", description: "(deprecated) .app-config.yml.database 블록으로 대체." }
-  database-mode:          { required: false, default: "none",  description: "(deprecated) .app-config.yml.database.name/ref 이분법으로 대체." }
-  database-name:          { required: false, default: "",      description: "(deprecated) .app-config.yml.database.name 으로 대체." }
-  database-role:          { required: false, default: "",      description: "role 이름 (비면 service-name 또는 app-name)" }
-  database-ref:           { required: false, default: "",      description: "(deprecated) .app-config.yml.database.ref 로 대체." }
-  database-storage:       { required: false, default: "10Gi",  description: "(deprecated) .app-config.yml.database.storage 로 대체." }
-  database-pg-image-tag:  { required: false, default: "16.13-standard-trixie", description: "CNPG postgres image tag" }
 
 outputs:
   tunnel-status:
@@ -49,61 +35,35 @@ runs:
     - name: Install yq
       uses: mikefarah/yq@v4
 
-    # ── Parse config (.app-config.yml 또는 deprecated inputs) ───────
-    # 리뷰 C1: caller (앱 레포) 가 읽어 전달한 config-yaml 문자열을 파싱.
-    # 리뷰 M5: hybrid — config-yaml 비어있으면 deprecated inputs (type/health/icon/db-*) 로 fallback.
+    # ── Parse config (.app-config.yml) ──────────────────────────────
+    # caller (앱 레포) 가 읽어 전달한 config-yaml 문자열을 파싱.
     # 이후 모든 step 은 steps.config.outputs.* 를 사용 (type/health/icon/description/db-mode/db-name/db-ref/db-storage).
-    - name: Parse config (.app-config.yml 또는 deprecated inputs)
+    - name: Parse config (.app-config.yml)
       id: config
       shell: bash
       env:
         APP_NAME: ${{ inputs.app-name }}
         APP_TOKEN: ${{ inputs.app-token }}
         CONFIG_YAML: ${{ inputs.config-yaml }}
-        IN_TYPE: ${{ inputs.type }}
-        IN_HEALTH: ${{ inputs.health }}
-        IN_ICON: ${{ inputs.icon }}
-        IN_DESCRIPTION: ${{ inputs.description }}
-        IN_DB_ENABLED: ${{ inputs.database-enabled }}
-        IN_DB_MODE: ${{ inputs.database-mode }}
-        IN_DB_NAME: ${{ inputs.database-name }}
-        IN_DB_REF: ${{ inputs.database-ref }}
-        IN_DB_STORAGE: ${{ inputs.database-storage }}
       run: |
         set -euo pipefail
 
-        if [ -n "$CONFIG_YAML" ]; then
-          echo "::notice::config-yaml 전달받음 — .app-config.yml 우선 파싱"
-          CONFIG_FILE=$(mktemp)
-          printf '%s\n' "$CONFIG_YAML" > "$CONFIG_FILE"
-
-          RAW_TYPE=$(yq '.type // ""' "$CONFIG_FILE")
-          HEALTH=$(yq '.health // "/health"' "$CONFIG_FILE")
-          ICON=$(yq '.icon // "mdi-application"' "$CONFIG_FILE")
-          DESCRIPTION=$(yq '.description // ""' "$CONFIG_FILE")
-          DB_NAME=$(yq '.database.name // ""' "$CONFIG_FILE")
-          DB_REF=$(yq '.database.ref // ""' "$CONFIG_FILE")
-          DB_STORAGE=$(yq '.database.storage // "10Gi"' "$CONFIG_FILE")
-          rm -f "$CONFIG_FILE"
-        else
-          echo "::warning::config-yaml 비어있음 — deprecated inputs 로 fallback (Phase 3b 이전 caller)"
-          RAW_TYPE="${IN_TYPE:-}"
-          HEALTH="${IN_HEALTH:-/health}"
-          ICON="${IN_ICON:-mdi-application}"
-          DESCRIPTION="$IN_DESCRIPTION"
-          if [ "$IN_DB_ENABLED" = "true" ]; then
-            if [ "$IN_DB_MODE" = "owner" ]; then
-              DB_NAME="$IN_DB_NAME"; DB_REF=""
-            elif [ "$IN_DB_MODE" = "reference" ]; then
-              DB_NAME=""; DB_REF="$IN_DB_REF"
-            else
-              DB_NAME=""; DB_REF=""
-            fi
-          else
-            DB_NAME=""; DB_REF=""
-          fi
-          DB_STORAGE="${IN_DB_STORAGE:-10Gi}"
+        if [ -z "$CONFIG_YAML" ]; then
+          echo "::error::config-yaml 필수 — caller 가 .app-config.yml 을 읽어 전달해야 합니다."
+          exit 1
         fi
+
+        CONFIG_FILE=$(mktemp)
+        printf '%s\n' "$CONFIG_YAML" > "$CONFIG_FILE"
+
+        RAW_TYPE=$(yq '.type // ""' "$CONFIG_FILE")
+        HEALTH=$(yq '.health // "/health"' "$CONFIG_FILE")
+        ICON=$(yq '.icon // "mdi-application"' "$CONFIG_FILE")
+        DESCRIPTION=$(yq '.description // ""' "$CONFIG_FILE")
+        DB_NAME=$(yq '.database.name // ""' "$CONFIG_FILE")
+        DB_REF=$(yq '.database.ref // ""' "$CONFIG_FILE")
+        DB_STORAGE=$(yq '.database.storage // "10Gi"' "$CONFIG_FILE")
+        rm -f "$CONFIG_FILE"
 
         # D2 변형: type 필드 → 내부 키 결정
         #   ""             → http  (HTTP service, 기본)
@@ -999,6 +959,8 @@ runs:
       run: |
         echo "::warning::database 블록은 현재 모노레포 (service-name 있음) 앱만 지원합니다. flat 앱 DB 는 향후 지원 예정. database composite step 을 skip 합니다."
 
+    # role-name 빈 값 → database composite 가 service-name|app-name 기반 기본값 사용.
+    # pg-image-tag 생략 → database composite 의 default (Renovate 가 추적) 사용.
     - name: Setup CNPG database (owner)
       if: steps.config.outputs.db-mode == 'owner' && inputs.service-name != ''
       uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
@@ -1008,8 +970,7 @@ runs:
         mode:                 owner
         db-name:              ${{ steps.config.outputs.db-name }}
         ref-db:               ""
-        role-name:            ${{ inputs.database-role }}
-        pg-image-tag:         ${{ inputs.database-pg-image-tag }}
+        role-name:            ""
         storage:              ${{ steps.config.outputs.db-storage }}
         r2-account-id:        ${{ inputs.tf-account-id }}
         r2-access-key-id:     ${{ inputs.r2-access-key-id }}
