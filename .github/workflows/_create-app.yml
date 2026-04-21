@@ -10,34 +10,47 @@ on:
         required: false
         type: string
         default: ""
-      app-type:
-        required: true
-        type: string
-      app-health:
-        required: false
-        type: string
-        default: ""
-      default-icon:
-        required: false
-        type: string
-        default: "mdi-application"
       service-name:
         description: "모노레포 서비스 이름. 비면 flat 앱(기존), 채우면 manifests/apps/<app>/services/<service>/ 구조로 생성."
         required: false
         type: string
         default: ""
+      # Phase 3 (deprecation-first): caller 가 전달하는 .app-config.yml 문자열.
+      # 비어있으면 setup-app 의 hybrid fallback 이 deprecated inputs (app-type/app-health/...)로 fallback.
+      # Phase 3b 에서 deprecated inputs 제거 후 이 필드는 required: true 로 승격 예정.
+      config-yaml:
+        description: ".app-config.yml 내용 (caller 가 읽어 전달). 비면 deprecated inputs 로 fallback."
+        required: false
+        type: string
+        default: ""
+      # Deprecated (Phase 3b 에서 제거). config-yaml 전달 시 setup-app 에서 무시됨.
+      app-type:
+        description: "(deprecated) .app-config.yml.type 으로 대체. config-yaml 비었을 때만 fallback."
+        required: false
+        type: string
+        default: ""
+      app-health:
+        description: "(deprecated) .app-config.yml.health 로 대체."
+        required: false
+        type: string
+        default: ""
+      default-icon:
+        description: "(deprecated) .app-config.yml.icon 으로 대체."
+        required: false
+        type: string
+        default: "mdi-application"
       database-enabled:
-        description: "CNPG DB 생성 여부 (Phase 7). false 면 DB 매니페스트 생성 skip."
+        description: "(deprecated) .app-config.yml.database 블록으로 대체."
         required: false
         type: boolean
         default: false
       database-mode:
-        description: "owner | reference | none (default=none)"
+        description: "(deprecated) .app-config.yml.database.name/ref 이분법으로 대체."
         required: false
         type: string
         default: "none"
       database-name:
-        description: "Database 이름 (database-mode=owner 필수)"
+        description: "(deprecated) .app-config.yml.database.name 으로 대체."
         required: false
         type: string
         default: ""
@@ -47,12 +60,12 @@ on:
         type: string
         default: ""
       database-ref:
-        description: "참조 대상 owner 서비스 이름 (database-mode=reference 전용)"
+        description: "(deprecated) .app-config.yml.database.ref 로 대체."
         required: false
         type: string
         default: ""
       database-storage:
-        description: "PVC size (리뷰 M9: default 10Gi, local-path resize 미지원)"
+        description: "(deprecated) .app-config.yml.database.storage 로 대체."
         required: false
         type: string
         default: "10Gi"
@@ -229,12 +242,10 @@ jobs:
         uses: ukkiee-dev/homelab/.github/actions/setup-app@main
         with:
           app-name: ${{ inputs.app-name }}
-          type: ${{ inputs.app-type }}
           subdomain: ${{ steps.resolve.outputs.subdomain }}
-          health: ${{ inputs.app-health }}
-          icon: ${{ inputs.default-icon }}
-          description: ${{ steps.desc.outputs.description }}
           service-name: ${{ inputs.service-name }}
+          # Phase 3: caller 가 전달한 .app-config.yml. 비면 setup-app 이 deprecated inputs 로 fallback.
+          config-yaml: ${{ inputs.config-yaml }}
           app-token: ${{ steps.app-token.outputs.token }}
           tf-cloudflare-token: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
           tf-zone-id: ${{ secrets.TF_ZONE_ID }}
@@ -243,7 +254,11 @@ jobs:
           r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           domain: ${{ secrets.TF_DOMAIN }}
-          # Phase 7 B: CNPG DB inputs passthrough
+          # Deprecated (Phase 3b 에서 제거). config-yaml 비었을 때 fallback 경로로만 사용됨.
+          type: ${{ inputs.app-type }}
+          health: ${{ inputs.app-health }}
+          icon: ${{ inputs.default-icon }}
+          description: ${{ steps.desc.outputs.description }}
           database-enabled: ${{ inputs.database-enabled }}
           database-mode: ${{ inputs.database-mode }}
           database-name: ${{ inputs.database-name }}
