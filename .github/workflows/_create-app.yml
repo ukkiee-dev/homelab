@@ -89,10 +89,9 @@ on:
 jobs:
   create:
     runs-on: ubuntu-latest
-    # workflow_call 에서 top-level permissions 는 GitHub Actions 가 startup_failure 로 거부 (2026-04-21 확인).
-    # job-level 로 이동.
-    permissions:
-      contents: write
+    # NOTE: workflow_call reusable 에 top-level 또는 job-level permissions 가 있으면
+    # caller 가 startup_failure 로 거부됨 (2026-04-21 GitHub Actions 동작 확인).
+    # 권한은 caller workflow 에서 정의해야 한다 (caller 의 permissions 가 reusable 에 상속).
 
     steps:
       # ── Validate ───────────────────────────────────────────

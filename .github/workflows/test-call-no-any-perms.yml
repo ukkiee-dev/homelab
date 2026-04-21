@@ -1,8 +1,0 @@
-name: Test Call No Any Perms
-on:
-  workflow_dispatch:
-jobs:
-  call:
-    uses: ./.github/workflows/_test-no-any-perms.yml
-    with:
-      app-name: x

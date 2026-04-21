@@ -33,10 +33,6 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # workflow_call 에서 top-level permissions 는 startup_failure 유발 (2026-04-21 확인).
-    permissions:
-      contents: write
-
     steps:
       - name: Generate token
         id: app-token
