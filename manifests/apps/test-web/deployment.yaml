@@ -40,7 +40,7 @@ spec:
           emptyDir: {}
       containers:
         - name: test-web
-          image: ghcr.io/ukkiee-dev/test-web:2482d59b77e60dfc9714663a03036467fc1f2766
+          image: ghcr.io/ukkiee-dev/test-web:40936b66fb19c62dda536c8fa91c64ec443dcf08
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
