@@ -191,3 +191,36 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "✅ reference 모드 신규 구성 대상 (db-ref=$DB_REF)"
           fi
+
+      # db-mode=owner → Cluster + Database CR + role-secret 생성
+      - name: Setup CNPG database (owner)
+        if: steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'owner'
+        uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
+        with:
+          app-name:             ${{ inputs.app-name }}
+          service-name:         ${{ inputs.service-name }}
+          mode:                 owner
+          db-name:              ${{ steps.config.outputs.db-name }}
+          ref-db:               ""
+          role-name:            ""
+          storage:              ${{ steps.config.outputs.db-storage }}
+          r2-account-id:        ${{ secrets.TF_ACCOUNT_ID }}
+          r2-access-key-id:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          homelab-path:         "."
+
+      # db-mode=reference → 서비스 Deployment env 에 PG 5개 주입
+      - name: Setup CNPG database (reference)
+        if: steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'reference'
+        uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
+        with:
+          app-name:             ${{ inputs.app-name }}
+          service-name:         ${{ inputs.service-name }}
+          mode:                 reference
+          db-name:              ""
+          ref-db:               ${{ steps.config.outputs.db-ref }}
+          role-name:            ""
+          r2-account-id:        ${{ secrets.TF_ACCOUNT_ID }}
+          r2-access-key-id:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          homelab-path:         "."
