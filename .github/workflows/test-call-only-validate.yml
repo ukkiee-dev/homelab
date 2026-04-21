@@ -1,0 +1,10 @@
+name: Test Call Only Validate
+on:
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_test-create-app-only-validate.yml
+    with:
+      app-name: x
+      app-type: web
+    secrets: inherit

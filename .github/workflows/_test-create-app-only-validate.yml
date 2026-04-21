@@ -1,0 +1,74 @@
+name: Create App Test Only Validate
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        required: true
+        type: string
+      subdomain:
+        required: false
+        type: string
+        default: ""
+      app-type:
+        required: true
+        type: string
+      app-health:
+        required: false
+        type: string
+        default: ""
+      default-icon:
+        required: false
+        type: string
+        default: "mdi-application"
+      service-name:
+        required: false
+        type: string
+        default: ""
+      database-enabled:
+        required: false
+        type: boolean
+        default: false
+      database-mode:
+        required: false
+        type: string
+        default: "none"
+      database-name:
+        required: false
+        type: string
+        default: ""
+      database-role:
+        required: false
+        type: string
+        default: ""
+      database-ref:
+        required: false
+        type: string
+        default: ""
+      database-storage:
+        required: false
+        type: string
+        default: "10Gi"
+      database-pg-image-tag:
+        required: false
+        type: string
+        default: "16.13-standard-trixie"
+    secrets:
+      APP_ID: { required: true }
+      APP_PRIVATE_KEY: { required: true }
+      TF_CLOUDFLARE_TOKEN: { required: true }
+      TF_ZONE_ID: { required: true }
+      TF_TUNNEL_ID: { required: true }
+      TF_ACCOUNT_ID: { required: true }
+      R2_ACCESS_KEY_ID: { required: true }
+      R2_SECRET_ACCESS_KEY: { required: true }
+      TF_DOMAIN: { required: false }
+      TELEGRAM_BOT_TOKEN: { required: false }
+      TELEGRAM_CHAT_ID: { required: false }
+permissions:
+  contents: write
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: echo only
+        run: echo "validate=${{ inputs.app-name }}"
