@@ -1,0 +1,8 @@
+name: Test Call Bool Only
+on:
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_test-bool-only.yml
+    with:
+      app-name: x
