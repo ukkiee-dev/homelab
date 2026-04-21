@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: test-phase3b
+  labels:
+    app.kubernetes.io/name: worker
+    app.kubernetes.io/part-of: test-phase3b
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/version: latest
+    app.kubernetes.io/managed-by: argocd
+spec:
+  revisionHistoryLimit: 3
+  replicas: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker
+      app.kubernetes.io/part-of: test-phase3b
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: worker
+        app.kubernetes.io/part-of: test-phase3b
+        app.kubernetes.io/version: latest
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: worker
+          image: ghcr.io/ukkiee-dev/test-phase3b-worker:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          env:
+            - name: PGHOST
+              value: test-phase3b-pg-rw.test-phase3b.svc
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: testdb
+            - name: PGUSER
+              value: api
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: test-phase3b-pg-api-credentials
+                  key: password
