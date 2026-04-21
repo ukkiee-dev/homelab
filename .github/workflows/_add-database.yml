@@ -46,3 +46,68 @@ jobs:
 
       - name: Install yq
         uses: mikefarah/yq@v4
+
+      # Phase 2 의 Parse config 로직 복제 (config-yaml 만 지원 — fallback 불필요).
+      # 이 workflow 는 Phase 2+ 전제라 deprecated inputs 경로 없음.
+      - name: Parse config
+        id: config
+        shell: bash
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+          CONFIG_YAML: ${{ inputs.config-yaml }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$CONFIG_YAML" ]; then
+            echo "::error::config-yaml 비어있음 — caller 가 .app-config.yml 을 전달하지 않았습니다"
+            exit 1
+          fi
+
+          CONFIG_FILE=$(mktemp)
+          printf '%s\n' "$CONFIG_YAML" > "$CONFIG_FILE"
+
+          RAW_TYPE=$(yq '.type // ""' "$CONFIG_FILE")
+          DB_NAME=$(yq '.database.name // ""' "$CONFIG_FILE")
+          DB_REF=$(yq '.database.ref // ""' "$CONFIG_FILE")
+          DB_STORAGE=$(yq '.database.storage // "10Gi"' "$CONFIG_FILE")
+          rm -f "$CONFIG_FILE"
+
+          # type 검증 (setup-app 과 동일)
+          case "$RAW_TYPE" in
+            "") TYPE=http ;;
+            worker) TYPE=worker ;;
+            web|static)
+              echo "::warning::type: $RAW_TYPE 은 deprecated"
+              TYPE=http
+              ;;
+            *)
+              echo "::error::invalid type: $RAW_TYPE"
+              exit 1
+              ;;
+          esac
+
+          # DB 모드 결정
+          if [ -n "$DB_NAME" ] && [ -n "$DB_REF" ]; then
+            echo "::error::database.name 과 database.ref 는 상호 배타"
+            exit 1
+          elif [ -n "$DB_NAME" ]; then
+            DB_MODE=owner
+          elif [ -n "$DB_REF" ]; then
+            DB_MODE=reference
+          else
+            DB_MODE=none
+          fi
+
+          {
+            echo "type=$TYPE"
+            echo "db-mode=$DB_MODE"
+            echo "db-name=$DB_NAME"
+            echo "db-ref=$DB_REF"
+            echo "db-storage=$DB_STORAGE"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "── Parse config 결과 ──────────────"
+          echo "  type=$TYPE db-mode=$DB_MODE"
+          if [ "$DB_MODE" != "none" ]; then
+            echo "  db-name=$DB_NAME db-ref=$DB_REF db-storage=$DB_STORAGE"
+          fi
