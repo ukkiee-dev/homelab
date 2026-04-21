@@ -30,8 +30,6 @@ on:
         required: true
       TF_DOMAIN:
         required: true
-      ARGOCD_AUTH_TOKEN:
-        required: true
 
 
 jobs:
@@ -364,75 +362,15 @@ jobs:
       - name: Push with retry
         uses: ./.github/actions/git-push-retry
 
-      # ── Step 3.5: ArgoCD Application 삭제 (REST API) ───────────
-      # root app이 prune: false이므로 git에서 YAML 삭제해도 Application CR이 자동 제거되지 않음
-      # ArgoCD REST API로 삭제 (GitHub-hosted runner에서도 동작)
-      # service 모드에서는 프로젝트 Application 유지하므로 skip
-      #
-      # 설계 포인트 (2026-04-21 incident 반영):
-      # - propagationPolicy=background: cascade=true 는 foreground blocking 이라 curl timeout(exit 28) 유발
-      # - set +e: bash -e 기본값은 curl timeout 시 HTTP 분기 실행을 막아 silent failure 발생
-      # - continue-on-error 제거: 실패 시 teardown 불완전 → notify-failure 에서 명시적 알림
-      # - 삭제 검증 polling: API 수락(HTTP 200)만으론 finalizer cascade 완료 보장 안 됨
-      - name: Delete ArgoCD Application via API
+      # ── Step 3.5: GitOps cascade 안내 ─────────────────────────
+      # 2026-04-22 refactor: argocd/root.yaml 이 prune: true 로 전환됨 →
+      # 이전 step 의 git push 후 root app sync 로 Application CR 자동 제거 + finalizer cascade.
+      # 별도 REST API 호출 불필요 (GHA runner → argo.ukkiee.dev curl timeout incident 회피).
+      - name: GitOps cascade notice
         if: steps.remove.outputs.delete_application == 'true'
         env:
-          ARGOCD_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
           APP_NAME: ${{ inputs.app-name }}
-          ARGOCD_HOST: argo.ukkiee.dev
         run: |
-          set +e  # curl exit code 를 직접 캡처
-
-          API_BASE="https://${ARGOCD_HOST}/api/v1/applications/${APP_NAME}"
-          DELETE_URL="${API_BASE}?propagationPolicy=background"
-
-          RESP=$(curl -s -w "\n%{http_code}" --max-time 60 -X DELETE \
-            "$DELETE_URL" \
-            -H "Authorization: Bearer ${ARGOCD_TOKEN}")
-          CURL_EXIT=$?
-          HTTP_CODE=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-
-          # curl 자체 실패 (timeout=28, connect refused=7, DNS=6, TLS=35 등) 명시적 처리
-          if [ $CURL_EXIT -ne 0 ]; then
-            echo "::error::ArgoCD API 호출 실패 (curl exit=${CURL_EXIT})"
-            echo "  참고: 28=timeout, 7=connect refused, 6=DNS, 35=TLS"
-            exit 1
-          fi
-
-          case "$HTTP_CODE" in
-            200|204)
-              echo "OK  ArgoCD Application 삭제 요청 수락 (HTTP ${HTTP_CODE})"
-              ;;
-            404)
-              echo "SKIP  ArgoCD Application 이미 없음"
-              exit 0
-              ;;
-            401|403)
-              echo "::error::ArgoCD 인증 실패 (HTTP ${HTTP_CODE}) — ARGOCD_AUTH_TOKEN 확인 필요"
-              echo "$BODY"
-              exit 1
-              ;;
-            *)
-              echo "::error::ArgoCD API 삭제 실패 (HTTP ${HTTP_CODE})"
-              echo "$BODY"
-              exit 1
-              ;;
-          esac
-
-          # 삭제 검증: finalizer cascade 완료까지 polling (최대 120s)
-          echo "── 삭제 검증 polling (최대 120s) ──"
-          for i in $(seq 1 24); do
-            sleep 5
-            CHECK=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-              "$API_BASE" \
-              -H "Authorization: Bearer ${ARGOCD_TOKEN}")
-            if [ "$CHECK" = "404" ]; then
-              echo "OK  Application 삭제 확인 (${i}회차, ~$((i*5))초 경과)"
-              exit 0
-            fi
-            echo "  [${i}/24] still present (HTTP ${CHECK})"
-          done
-          echo "::error::120초 내 Application 삭제 미확인 — finalizer 수동 확인 필요"
-          echo "  kubectl get application ${APP_NAME} -n argocd"
-          exit 1
+          echo "::notice::argocd/applications/apps/${APP_NAME}.yaml 제거 커밋 push 완료."
+          echo "::notice::root app (prune: true) 이 다음 sync 주기 (보통 1~3 분) 에 Application CR 삭제 → finalizer cascade 로 namespace·Deployment·Cluster 자동 정리."
+          echo "::notice::즉시 검증: kubectl -n argocd get app ${APP_NAME}  (NotFound 가 최종 상태)"
