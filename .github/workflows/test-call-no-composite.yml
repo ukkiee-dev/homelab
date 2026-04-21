@@ -1,0 +1,8 @@
+name: Test Call No Composite
+on:
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_test-create-app-no-composite.yml
+    with:
+      app-name: test
