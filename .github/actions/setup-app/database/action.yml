@@ -213,9 +213,11 @@ runs:
         awk -v pw="$PASSWORD" '{gsub(/__PASSWORD__/, pw); print}' "$PLAIN" > "${PLAIN}.new"
         mv "${PLAIN}.new" "$PLAIN"
 
-        # 이미 다른 role 이 seal 되어 append 필요 — 기존 파일 있으면 뒤에 --- 로 합침
+        # 이미 다른 role 이 seal 되어 append 필요 — 기존 파일 있으면 뒤에 --- 로 합침.
+        # offline 모드: GitHub-hosted runner 는 kubeconfig 없음 → controller public cert 로 암호화.
+        # cert 는 manifests/infra/sealed-secrets/controller-cert.pem 로 커밋 (공개키, 안전).
         TMP_SEALED="/tmp/role-sealed-${APP}-${ROLE}.yaml"
-        kubeseal --controller-namespace kube-system --controller-name sealed-secrets \
+        kubeseal --cert "${HOMELAB}/manifests/infra/sealed-secrets/controller-cert.pem" \
           --format=yaml \
           < "$PLAIN" \
           > "$TMP_SEALED"
@@ -260,7 +262,8 @@ runs:
           "${TEMPLATE_DIR}/r2-backup-secret.yaml.tpl" \
           > "$PLAIN"
 
-        kubeseal --controller-namespace kube-system --controller-name sealed-secrets \
+        # offline 모드 — role password seal 과 동일.
+        kubeseal --cert "${HOMELAB}/manifests/infra/sealed-secrets/controller-cert.pem" \
           --format=yaml \
           < "$PLAIN" \
           > "$SEALED"
