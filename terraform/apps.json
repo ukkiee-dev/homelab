@@ -1,8 +1,5 @@
 {
   "test-web": {
     "subdomain": "test-web"
-  },
-  "test-phase7c-web": {
-    "subdomain": "test-phase7c-web"
   }
 }
