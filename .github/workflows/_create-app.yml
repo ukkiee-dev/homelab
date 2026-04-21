@@ -182,9 +182,9 @@ jobs:
               ;;
             404)
               echo "::warning::GHCR 이미지 미존재: ghcr.io/ukkiee-dev/${PKG}:latest"
-              echo "  매니페스트는 생성되지만 ArgoCD sync 직후 ImagePullBackOff 상태가 됩니다."
-              echo "  - 정식 앱: 이어서 레포에 코드 push -> build workflow 가 이미지 생성 후 자연 해소"
-              echo "  - 테스트 스캐폴딩: 즉시 teardown 권장 (알람 노이즈 및 고아 Application 위험)"
+              echo "  setup-app 이 Deployment 를 replicas=0 으로 초기 배포합니다 (ImagePullBackOff 방지)."
+              echo "  - 정식 앱: 레포에 코드 push -> build workflow -> _update-image 가 replicas 0->1 bump"
+              echo "  - 테스트 스캐폴딩: 즉시 teardown 권장 (pod 은 없지만 Application/namespace 는 잔존)"
               ;;
             *)
               echo "::warning::GHCR API 호출 이상 (HTTP ${STATUS}) -- 이미지 존재 여부 확인 실패, 계속 진행"

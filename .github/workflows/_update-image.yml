@@ -74,15 +74,28 @@ jobs:
             ".spec.template.spec.containers[0].image = strenv(IMAGE)" \
             "$FILE"
 
+          # 이미지 적용 후 replicas 확인 — 0 이면 1 로 bump (첫 이미지 활성화).
+          # 2026-04-21 test-phase7c incident follow-up: setup-app 이 이미지 없는 상태에서
+          # replicas=0 으로 초기화한 경우를 cover. 첫 _update-image 호출 = "앱 활성화" 시점.
+          # 기존 앱은 이미 replicas>=1 이라 no-op. 사용자가 의도적 scale down 한 상태면
+          # 이 로직으로 덮어쓰지만, 첫 이미지 배포 맥락에서는 활성화가 기본 의도.
+          CURRENT_REPLICAS=$(yq eval '.spec.replicas' "$FILE")
+          BUMP_NOTE=""
+          if [ "$CURRENT_REPLICAS" = "0" ]; then
+            yq eval -i '.spec.replicas = 1' "$FILE"
+            BUMP_NOTE=" + replicas 0->1"
+            echo "OK  replicas 0 -> 1 bump (첫 이미지 활성화)"
+          fi
+
           git config user.email "deploy-bot@users.noreply.github.com"
           git config user.name "deploy-bot[bot]"
 
           if git diff --quiet; then
-            echo "⏭️  이미지 변경 없음"
+            echo "변경 없음 -- image/replicas 동일, 커밋 스킵"
             exit 0
           fi
 
-          git commit -am "chore: update ${COMMIT_SCOPE} → ${IMAGE_TAG}"
+          git commit -am "chore: update ${COMMIT_SCOPE} -> ${IMAGE_TAG}${BUMP_NOTE}"
 
       - name: Push with retry
         uses: ./.github/actions/git-push-retry
