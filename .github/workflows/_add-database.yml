@@ -111,3 +111,80 @@ jobs:
           if [ "$DB_MODE" != "none" ]; then
             echo "  db-name=$DB_NAME db-ref=$DB_REF db-storage=$DB_STORAGE"
           fi
+
+      # I1: 완전 idempotent + name/ref 변경만 error.
+      # 추가로 service 디렉토리 존재 확인 + db-mode=none 조기 종료.
+      - name: Validate (idempotency + immutability)
+        id: validate
+        shell: bash
+        env:
+          APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service-name }}
+          DB_MODE: ${{ steps.config.outputs.db-mode }}
+          DB_NAME: ${{ steps.config.outputs.db-name }}
+          DB_REF: ${{ steps.config.outputs.db-ref }}
+        run: |
+          set -euo pipefail
+
+          # 1. db-mode=none 이면 조기 종료 (정상)
+          if [ "$DB_MODE" = "none" ]; then
+            echo "::notice::.app-config.yml 에 database 블록 없음 — skip"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 2. service 디렉토리 존재 확인
+          SVC_DIR="manifests/apps/${APP}/services/${SERVICE}"
+          if [ ! -d "$SVC_DIR" ]; then
+            echo "::error::service 디렉토리 없음: $SVC_DIR"
+            echo "::error::먼저 create-app.yml 로 서비스를 생성하세요"
+            exit 1
+          fi
+
+          # 3. 기존 DB 설정 조회 (common/database-shared.yaml)
+          SHARED="manifests/apps/${APP}/common/database-shared.yaml"
+          CURRENT_DB=""
+          if [ -f "$SHARED" ]; then
+            CURRENT_DB=$(yq '.spec.name // ""' "$SHARED")
+          fi
+
+          # 4. 기존 reference env 조회 (Deployment env 에서 PGUSER 값 = owner-role = ref 값)
+          DEPLOYMENT="$SVC_DIR/deployment.yaml"
+          CURRENT_PGUSER=""
+          if [ -f "$DEPLOYMENT" ]; then
+            CURRENT_PGUSER=$(yq '.spec.template.spec.containers[0].env // [] | map(select(.name == "PGUSER")) | .[0].value // ""' "$DEPLOYMENT")
+          fi
+
+          # 5. owner 모드 검증
+          if [ "$DB_MODE" = "owner" ]; then
+            if [ -n "$CURRENT_DB" ] && [ "$CURRENT_DB" != "$DB_NAME" ]; then
+              echo "::error::database.name 변경 감지: '$CURRENT_DB' → '$DB_NAME'"
+              echo "::error::DB 이름 변경은 자동 마이그레이션 불가. Runbook 참조:"
+              echo "::error::  docs/runbooks/postgresql/cnpg-new-project.md"
+              exit 1
+            fi
+            if [ -n "$CURRENT_DB" ] && [ "$CURRENT_DB" = "$DB_NAME" ]; then
+              echo "::notice::이미 owner DB 구성 완료 (name=$DB_NAME) — skip"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "✅ owner 모드 신규 구성 대상 (db-name=$DB_NAME)"
+          fi
+
+          # 6. reference 모드 검증
+          if [ "$DB_MODE" = "reference" ]; then
+            # reference target (owner 서비스) 존재 확인은 setup-app/database 의 validate-ref step 이 처리
+            if [ -n "$CURRENT_PGUSER" ] && [ "$CURRENT_PGUSER" != "$DB_REF" ]; then
+              echo "::error::database.ref 변경 감지: '$CURRENT_PGUSER' → '$DB_REF'"
+              echo "::error::reference 변경은 teardown 후 재구성 필요"
+              exit 1
+            fi
+            if [ -n "$CURRENT_PGUSER" ] && [ "$CURRENT_PGUSER" = "$DB_REF" ]; then
+              echo "::notice::이미 reference 구성 완료 (ref=$DB_REF) — skip"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "✅ reference 모드 신규 구성 대상 (db-ref=$DB_REF)"
+          fi
