@@ -277,3 +277,49 @@ jobs:
             ' "$APP_FILE"
             echo "✅ ArgoCD Application 에 CNPG Cluster ignoreDifferences 추가"
           fi
+
+      - name: Commit & Push
+        if: steps.validate.outputs.skip != 'true'
+        shell: bash
+        env:
+          APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service-name }}
+          DB_MODE: ${{ steps.config.outputs.db-mode }}
+          DB_NAME: ${{ steps.config.outputs.db-name }}
+          DB_REF: ${{ steps.config.outputs.db-ref }}
+        run: |
+          set -euo pipefail
+          git config user.email "deploy-bot@users.noreply.github.com"
+          git config user.name "deploy-bot[bot]"
+
+          git add manifests/ argocd/
+
+          if git diff --staged --quiet; then
+            echo "변경사항 없음 — 이미 반영됨, 커밋 skip"
+            exit 0
+          fi
+
+          if [ "$DB_MODE" = "owner" ]; then
+            git commit -m "feat(db): add owner DB '${DB_NAME}' to ${APP}/${SERVICE}"
+          else
+            git commit -m "feat(db): add reference to '${DB_REF}' in ${APP}/${SERVICE}"
+          fi
+
+      - name: Push with retry
+        if: steps.validate.outputs.skip != 'true'
+        uses: ./.github/actions/git-push-retry
+
+      # Telegram 알림 (선택)
+      - name: Notify success (Telegram)
+        if: success() && steps.validate.outputs.skip != 'true'
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service-name }}
+          DB_MODE: ${{ steps.config.outputs.db-mode }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then exit 0; fi
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d chat_id="${TG_CHAT}" \
+            -d text="🗄️ DB 추가 완료 (${DB_MODE}): ${APP}/${SERVICE}"
