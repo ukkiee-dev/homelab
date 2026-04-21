@@ -210,6 +210,62 @@ gh search code 'ukkiee-dev/homelab/.github/workflows/_create-app.yml@main' --own
 
 reference 시나리오 1시간, owner 시나리오 추가 1시간 (teardown 포함).
 
+### 실행 결과 (2026-04-22)
+
+실제로는 **하이브리드 (owner + reference 한 레포)** 로 검증. pokopia-wiki GitHub 레포 부재(후속 1 Case A 참조) 때문에 시나리오 1 불가 → 시나리오 2 를 확장하여 monorepo owner + reference 를 한 임시 레포 (`ukkiee-dev/test-phase3b`) 에서 동시 검증.
+
+#### 실행 흐름
+
+1. `gh repo create ukkiee-dev/test-phase3b --template ukkiee-dev/app-starter --public --clone`
+2. `pnpm run setup && pnpm install`
+3. `pnpm service:add api --type web` + `services/api/.app-config.yml.database: { name: testdb, storage: 1Gi }`
+4. `pnpm service:add worker --type worker` + `services/worker/.app-config.yml.database: { ref: api }`
+5. push → build.yml 트리거 (이미지 없음 → notice)
+6. `gh workflow run create-app.yml -f service-name=api -f subdomain=test-phase3b-api` → **실패 1 (kubeseal online 모드)**
+7. **Phase 2: `fix(database): kubeseal offline 모드 전환` PR #34** 머지 후 재시도 → 성공
+8. api Application Synced/Healthy, CNPG Cluster healthy=1/1, SealedSecret 2개 Synced=True
+9. `gh workflow run create-app.yml -f service-name=worker` → 성공
+10. worker Deployment env 5개 주입 확인 (매니페스트 + 클러스터 2중 일치)
+11. `gh workflow run add-database.yml -f service-name=worker` 재실행 → `::notice::이미 reference 구성 완료` + homelab HEAD 불변 (멱등성)
+12. `gh workflow run teardown.yml -f app-name=test-phase3b` → **실패 2 (ArgoCD REST API curl timeout)**
+13. **Phase B: `fix(teardown): GitOps cascade 전환` PR #35** 머지 + `kubectl apply -f argocd/root.yaml` → Application cascade prune 완료
+14. `gh repo archive ukkiee-dev/test-phase3b`
+
+#### 검증 포인트 통과 증거
+
+| 항목 | 결과 |
+|------|------|
+| 임시 레포 scaffolding | app-starter 템플릿 + pnpm service:add 로 api/worker 2개 서비스 monorepo 완성 |
+| owner DB 배포 | CNPG Cluster `test-phase3b-pg` healthy=1/1, Database CR `testdb` applied=true, managed.roles=[api] |
+| SealedSecret offline seal | `r2-pg-backup`, `test-phase3b-pg-api-credentials` 둘 다 Synced=True (kubeseal `--cert` offline 모드 실증) |
+| reference PG env 주입 | 매니페스트 + 클러스터 모두 5개 env 정확 일치 (PGHOST/PGPORT/PGDATABASE=testdb/PGUSER=api/PGPASSWORD→owner secretKeyRef) |
+| ArgoCD Application | `test-phase3b` Synced/Healthy |
+| add-database 멱등성 | `##[notice]이미 reference 구성 완료 (ref=api) — skip` + homelab HEAD 변화 없음 |
+| GitOps cascade teardown | ns + Application 모두 NotFound, root Synced/Healthy, DNS/Tunnel/GHCR 모두 cleanup |
+| 레포 archive | isArchived=true |
+
+#### 발견한 blocker + 구조적 fix
+
+1. **kubeseal online 모드 → offline 전환** (PR #34, `fix(database): kubeseal offline 모드 전환`)
+   - 설계 의도 (ARC in-cluster runner) 와 실행 환경 (GitHub-hosted runner) 괴리. `actions-runner-system` namespace 에 Pod/CRD 없어 ARC 미배포 상태로 밝혀짐.
+   - 해결: controller public cert 를 `manifests/infra/sealed-secrets/controller-cert.pem` 커밋 + composite 의 `--controller-*` flag 를 `--cert <path>` 로 전환.
+
+2. **teardown ArgoCD REST API → GitOps cascade** (PR #35, `fix(teardown): GitOps cascade 전환`)
+   - `_teardown.yml` Step 3.5 가 `argo.ukkiee.dev` 외부 호출 → GHA runner 에서 curl timeout (exit 28).
+   - 해결: `argocd/root.yaml` `prune: false → true` 로 전환 + Step 3.5 제거. git 삭제 → root sync prune → finalizer cascade.
+
+#### 암묵지 (memory 로 기록 가치)
+
+- **GHA runner 에서 homelab 클러스터 접근 불가** — kubeconfig 없음 + 외부 호스트(argo.ukkiee.dev) timeout. 앞으로 GHA 에서 클러스터 상태 변경이 필요한 모든 composite 는 offline 모드 (cert/manifest 기반) 또는 Git-driven GitOps 로 설계해야 한다.
+- **ARC 는 설계만 되고 배포 안 된 상태** — `manifests/infra/arc-runners/` 의 values 에 placeholder 만 있음. helm install 이 필요하지만 GitHub App 설치 + SealedSecret 등 선행 작업 있어 현재 우선순위 낮음.
+- **app-starter `pnpm service:add` 안내의 오류** — `gh workflow run _create-app.yml` 을 직접 호출하도록 안내하지만, 실제로는 `create-app.yml` (workflow_dispatch caller) 를 경유해야 `read-config` job 이 `.app-config.yml` 을 읽어 전달. app-starter 의 add-service 출력 스크립트 수정 필요 (후속 과제).
+
+#### 후속 과제 (별도 세션 이관)
+
+- **app-starter `add-service.ts` 출력 안내 수정** — `_create-app.yml` 직접 호출 → `create-app.yml` 경유로 정정
+- **pokopia-wiki 레포 재생성 또는 정리** — GitHub 에 부재 상태이나 K8s 에 배포된 상태. 장기적으로 homelab 에서 pokopia-wiki manifests 를 teardown 하거나 새 레포로 복원 결정 필요
+- **ARC 배포 재검토** — GitOps 가 대부분 해소했으니 ARC 는 우선순위 낮음. 다만 향후 in-cluster 빌드·테스트 필요 시 재평가
+
 ---
 
 ## 진행 권장 순서
