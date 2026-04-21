@@ -224,3 +224,56 @@ jobs:
           r2-access-key-id:     ${{ secrets.R2_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           homelab-path:         "."
+
+      # owner 생성 후: 루트 kustomization 에 "common" 추가 + ArgoCD Application 에
+      # CNPG Cluster ignoreDifferences 추가. setup-app/action.yml 과 동일 로직.
+      - name: Update ArgoCD Application for DB (owner post-processing)
+        if: steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'owner'
+        shell: bash
+        env:
+          APP: ${{ inputs.app-name }}
+        run: |
+          set -euo pipefail
+
+          # 1. 루트 kustomization 에 common/ 추가 (idempotent)
+          ROOT_KUST="manifests/apps/${APP}/kustomization.yaml"
+          if [ -f "$ROOT_KUST" ]; then
+            if ! yq eval '.resources[]' "$ROOT_KUST" | grep -qx "common"; then
+              yq eval -i '.resources = (.resources + ["common"] | unique)' "$ROOT_KUST"
+              echo "✅ 루트 kustomization 에 common/ 추가"
+            else
+              echo "⏭️  루트 kustomization 에 common/ 이미 존재"
+            fi
+          fi
+
+          # 2. ArgoCD Application 에 CNPG Cluster ignoreDifferences 추가 (idempotent via unique_by)
+          APP_FILE="argocd/applications/apps/${APP}.yaml"
+          if [ -f "$APP_FILE" ]; then
+            CLUSTER_NAME="${APP}-pg"
+            APP_NS="$APP" CLUSTER_NAME="$CLUSTER_NAME" yq eval -i '
+              .spec.ignoreDifferences = ((.spec.ignoreDifferences // []) + [{
+                "group": "postgresql.cnpg.io",
+                "kind": "Cluster",
+                "name": env(CLUSTER_NAME),
+                "namespace": env(APP_NS),
+                "jsonPointers": [
+                  "/spec/affinity",
+                  "/spec/bootstrap",
+                  "/spec/enablePDB",
+                  "/spec/enableSuperuserAccess",
+                  "/spec/failoverDelay",
+                  "/spec/logLevel",
+                  "/spec/maxSyncReplicas",
+                  "/spec/minSyncReplicas"
+                ],
+                "jqPathExpressions": [
+                  ".spec.managed.roles[].connectionLimit",
+                  ".spec.managed.roles[].inherit",
+                  ".spec.monitoring.customQueriesConfigMap",
+                  ".spec.monitoring.disableDefaultQueries",
+                  ".spec.plugins[].enabled"
+                ]
+              }] | unique_by(.kind + "/" + .name))
+            ' "$APP_FILE"
+            echo "✅ ArgoCD Application 에 CNPG Cluster ignoreDifferences 추가"
+          fi
