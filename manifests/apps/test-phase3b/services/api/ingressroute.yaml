@@ -1,0 +1,31 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: api
+  namespace: test-phase3b
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: test-phase3b
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: "Apps"
+    gethomepage.dev/name: "test-phase3b/api"
+    gethomepage.dev/icon: "mdi-application"
+    gethomepage.dev/href: "https://test-phase3b-api.ukkiee.dev"
+    gethomepage.dev/description: "Phase 3b + add-database E2E 검증용 임시 레포 (2026-04-22). 검증 완료 후 archive/삭제."
+    gethomepage.dev/pod-selector: "app.kubernetes.io/name=api"
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`test-phase3b-api.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+          namespace: traefik-system
+        - name: gzip
+          namespace: traefik-system
+      services:
+        - name: api
+          port: 3000

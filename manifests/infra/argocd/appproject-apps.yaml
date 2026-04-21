@@ -17,6 +17,8 @@ spec:
     # Phase 6 (CNPG migration): 첫 CNPG 실 프로젝트 (리뷰 H1 반영)
     - namespace: pokopia-wiki
       server: https://kubernetes.default.svc
+    - namespace: test-phase3b
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

@@ -50,6 +50,8 @@ spec:
     # destination 을 추가했지만 infra 에도 필요 (scheduling 거부 방지).
     - namespace: pokopia-wiki
       server: https://kubernetes.default.svc
+    - namespace: test-phase3b
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
