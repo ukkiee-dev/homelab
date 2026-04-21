@@ -1,0 +1,16 @@
+name: Test No Perms
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        required: true
+        type: string
+      database-enabled:
+        required: false
+        type: boolean
+        default: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ inputs.app-name }}"
