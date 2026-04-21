@@ -1,0 +1,38 @@
+name: Test With Setup-App
+on:
+  workflow_call:
+    inputs:
+      app-name: { required: true, type: string }
+    secrets:
+      APP_ID: { required: true }
+      APP_PRIVATE_KEY: { required: true }
+      TF_CLOUDFLARE_TOKEN: { required: true }
+      TF_ZONE_ID: { required: true }
+      TF_TUNNEL_ID: { required: true }
+      TF_ACCOUNT_ID: { required: true }
+      R2_ACCESS_KEY_ID: { required: true }
+      R2_SECRET_ACCESS_KEY: { required: true }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Token
+        id: tok
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ukkiee-dev
+          repositories: homelab
+      - name: Run setup-app (just check it loads)
+        uses: ukkiee-dev/homelab/.github/actions/setup-app@main
+        with:
+          app-name: dummy
+          type: web
+          app-token: ${{ steps.tok.outputs.token }}
+          tf-cloudflare-token: ${{ secrets.TF_CLOUDFLARE_TOKEN }}
+          tf-zone-id: ${{ secrets.TF_ZONE_ID }}
+          tf-tunnel-id: ${{ secrets.TF_TUNNEL_ID }}
+          tf-account-id: ${{ secrets.TF_ACCOUNT_ID }}
+          r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
