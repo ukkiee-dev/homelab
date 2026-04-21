@@ -1,6 +1,6 @@
 # Homelab 재해복구 절차서
 
-> 최종 수정: 2026-04-18
+> 최종 수정: 2026-04-21 (CNPG 마이그레이션 반영)
 > 대상: Mac Mini M4 + OrbStack K3s + ArgoCD GitOps
 > 도메인: `ukkiee.dev`
 
@@ -19,6 +19,8 @@
 | Network Policies | Kustomize | (각 namespace) |
 | ARC Runners | Helm | actions-runner-system |
 | Tailscale Operator | Helm | tailscale-system |
+| cert-manager | Helm | cert-manager |
+| CNPG Operator + plugin-barman-cloud | Helm + Kustomize | cnpg-system |
 
 ### Applications (apps/)
 
@@ -27,7 +29,9 @@
 | Homepage | Kustomize | apps | ConfigMap (stateless) |
 | AdGuard Home | Kustomize | apps | PVC (설정 + 필터) |
 | Uptime Kuma | Kustomize | apps | PVC (모니터링 설정) |
-| PostgreSQL | Kustomize | apps | PVC + CronJob pg_dump 백업 |
+| PostgreSQL (Bitnami, 폐기 예정 Phase 8) | Helm | apps | PVC + CronJob pg_dump 백업 |
+| CNPG Clusters (프로젝트별) | Kustomize | `<project>` | PVC (local-path) + R2 Barman archive (지속) |
+| pokopia-wiki | Kustomize | pokopia-wiki | CNPG Cluster + Database + ObjectStore |
 | Test Web | Kustomize | test-web | - (CI/CD 테스트용) |
 
 ### Monitoring (monitoring/)
@@ -56,6 +60,18 @@
 | C. PVC 데이터 손상 | 중간 | 최대 24시간 | 15~30분 |
 | D. Mac Mini OS 재설치 | 높음 | PVC 데이터 | 1~2시간 |
 | E. Mac Mini 하드웨어 고장 | 매우 높음 | 로컬 전체 | 2~4시간 |
+| F. CNPG Cluster 데이터 손상 (PITR 복구) | 중간 | 최대 WAL archive lag (~5분) | 15~30분 |
+| G. CNPG Cluster 별도 namespace 복구 (DR) | 중간 | 선택 시점 스냅샷 | 20~40분 |
+
+### CNPG RTO / RPO 수치 (Phase 4 측정값)
+
+| 지표 | 값 | 근거 |
+|------|----|----|
+| RTO (PITR 동일 namespace) | 약 15분 | Phase 4 Task 4.6a 드라이런 |
+| RTO (DR 별도 namespace) | 약 25분 | Phase 4 Task 4.6b 드라이런 |
+| RPO (WAL archive 주기) | ≤ 5분 | CNPG plugin-barman-cloud 기본 + `wal_compression=lz4` |
+| Base backup 빈도 | 매일 02:00 KST | ScheduledBackup `0 0 2 * * *` |
+| R2 보존 | `retentionPolicy: 7d` (ObjectStore) | v0.4 plan 채택값 |
 
 ---
 
@@ -67,7 +83,9 @@
 | **시크릿 원본값** | CF API Token, Tunnel Token, OAuth 키 등 | 비밀번호 매니저 |
 | **Tailscale OAuth** | operator-oauth Secret (client_id, client_secret) | 비밀번호 매니저 |
 | **PVC 백업** | `backup.sh` 출력 (Uptime Kuma, AdGuard conf) | 외장 SSD `/Volumes/ukkiee/homelab/backups` (LaunchAgent 매월 1일 04:00 KST + `make backup` 수동) |
-| **PostgreSQL pgdump** | PostgreSQL DB (CronJob 매일 03:00 KST 자동 덤프) | apps namespace PVC |
+| **PostgreSQL pgdump (Bitnami, 폐기 예정)** | PostgreSQL DB (CronJob 매일 03:00 KST 자동 덤프) | apps namespace PVC |
+| **CNPG R2 Barman archive** | 각 CNPG Cluster 의 base backup + WAL archive | Cloudflare R2 `homelab-db-backups` 버킷 (prefix: `<project>-pg/`) |
+| **R2 credentials (cnpg-barman-r2-token)** | R2 접근용 access_key_id/secret_access_key (각 project namespace 에 SealedSecret) | `kubectl get secret -n <project> r2-backup-credentials -o yaml` → 원본은 1Password |
 
 ### 백업 불필요 (Git에서 복구 가능)
 
@@ -184,7 +202,32 @@ make pvc
 
 ### E. Mac Mini 하드웨어 고장
 
-시나리오 D와 동일. PVC 백업이 외부에 없으면 데이터 전체 손실.
+시나리오 D와 동일. PVC 백업이 외부에 없으면 데이터 전체 손실. CNPG Cluster 는 **R2 Barman archive 로 DR 복구 가능** (시나리오 G 참조) — local PVC 손실 영향 없음.
+
+### F. CNPG Cluster 데이터 손상 (PITR 복구)
+
+복구 대상 namespace = 원본 namespace. 데이터 시점을 특정 시각으로 되돌릴 때 사용.
+
+> **상세 절차**: [`docs/runbooks/postgresql/cnpg-pitr-restore.md`](runbooks/postgresql/cnpg-pitr-restore.md)
+
+핵심 단계:
+1. 손상 시점 식별 + 복구 대상 시각 결정
+2. 원본 Cluster 삭제 (finalizer cascade)
+3. `bootstrap.recovery` + `externalClusters[]` 블록으로 recovery Cluster 선언 (Git PR)
+4. ScheduledBackup 일시 suspend → 복구 완료 후 resume
+5. **serverName 충돌 주의**: 동일 serverName 으로 재선언 시 "Expected empty archive" 오류. 운영환경에서는 `-v2` 등 increment 필요.
+
+### G. CNPG Cluster 별도 namespace 복구 (DR/감사용)
+
+운영 Cluster 는 그대로 두고 별도 namespace 에 과거 시점 스냅샷 구성. 감사·원인분석에 사용.
+
+> **상세 절차**: [`docs/runbooks/postgresql/cnpg-dr-new-namespace.md`](runbooks/postgresql/cnpg-dr-new-namespace.md)
+
+핵심 단계:
+1. 신규 namespace 생성 (예: `<project>-dr`)
+2. `externalClusters[]` 에 원본 R2 ObjectStore 참조
+3. 새 Cluster 선언 + `bootstrap.recovery` 의 `recoveryTarget.targetTime` 지정
+4. 완료 후 애플리케이션 연결 확인 → 감사 종료 시 namespace 삭제
 
 ---
 
@@ -207,7 +250,9 @@ kubectl apply -f sealed-secrets-key-backup.yaml
 | 대상 | 방식 | 주기 | 보존 |
 |------|------|------|------|
 | Uptime Kuma, AdGuard conf | `backup.sh` → 외장 SSD (LaunchAgent `dev.ukkiee.homelab-backup`) + 수동 `make backup` | 매월 1일 04:00 KST | 최근 7개 (≈7개월) |
-| PostgreSQL | CronJob `postgresql-backup` | 매일 03:00 KST | 7일 |
+| PostgreSQL (Bitnami, 폐기 예정 Phase 8) | CronJob `postgresql-backup` | 매일 03:00 KST | 7일 |
+| CNPG base backup (각 프로젝트 Cluster) | `ScheduledBackup` → R2 barman archive | 매일 02:00 KST | 7일 (`ObjectStore.retentionPolicy`) |
+| CNPG WAL archive (continuous) | plugin-barman-cloud → R2 | 상시 (paceholder 5분) | base backup 주기에 연동 |
 
 ---
 
@@ -239,7 +284,10 @@ kubectl apply -f sealed-secrets-key-backup.yaml
 - [ ] Uptime Kuma 모니터 설정 존재
 - [ ] AdGuard 필터/설정 복원
 - [ ] Traefik ACME 인증서 존재
-- [ ] PostgreSQL 백업 CronJob 정상 실행
+- [ ] PostgreSQL (Bitnami) 백업 CronJob 정상 실행 (Phase 8 전까지)
+- [ ] 모든 CNPG Cluster `STATUS=healthy`, `READY=1/1`
+- [ ] 최근 24h 내 CNPG ScheduledBackup 성공 (`kubectl get backup -A | tail`)
+- [ ] R2 `homelab-db-backups` 버킷 접근 가능 (aws s3 ls 또는 Cloudflare dashboard)
 
 ---
 
