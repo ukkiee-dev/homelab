@@ -15,6 +15,11 @@ spec:
     path: manifests/infra/network-policies
   destination:
     server: https://kubernetes.default.svc
+    # Application spec validation 용도의 placeholder.
+    # 각 NetworkPolicy 는 자체 metadata.namespace 를 가지므로 실제 배포 대상은 매니페스트마다 다르다
+    # (apps/traefik-system/networking/monitoring). AppProject `infra` destinations 에 각 ns 가 허용되어
+    # resource-level 검증은 통과한다. scheduling.yaml 과 동일한 multi-namespace 패턴.
+    namespace: kube-system
   syncPolicy:
     automated:
       selfHeal: true
