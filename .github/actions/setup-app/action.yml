@@ -989,11 +989,10 @@ runs:
         yq eval -i '.' "$APP_FILE"
         echo "✅ ArgoCD Application 생성 완료 (monorepo shell)"
 
-    # ── Step 3c: CNPG DB 매니페스트 생성 (Phase 7 B) ──────────────
+    # ── Step 3c: CNPG DB 매니페스트 생성 ────────────────────────
     # Phase 2: db-mode 는 Parse config step 이 .app-config.yml.database.name/ref 로부터 결정.
-    # 모노레포 (service-name 있음) + db-mode=owner 에서만 실행.
+    # Phase 6: owner + reference 모두 지원. 모노레포 (service-name 있음) 에서만 실행.
     # flat 앱은 현재 common/ 구조가 없어 database composite 와 충돌 가능 → 후속 확장에서 지원.
-    # Phase 6 에서 db-mode=reference step 추가 예정.
     - name: Warn if database configured on flat app
       if: steps.config.outputs.db-mode != 'none' && inputs.service-name == ''
       shell: bash
@@ -1012,6 +1011,24 @@ runs:
         role-name:            ${{ inputs.database-role }}
         pg-image-tag:         ${{ inputs.database-pg-image-tag }}
         storage:              ${{ steps.config.outputs.db-storage }}
+        r2-account-id:        ${{ inputs.tf-account-id }}
+        r2-access-key-id:     ${{ inputs.r2-access-key-id }}
+        r2-secret-access-key: ${{ inputs.r2-secret-access-key }}
+        homelab-path:         _homelab
+
+    # Phase 6: reference 모드 — owner 의 common/database-shared.yaml 에서 db·role 추출 후
+    # reference 서비스 Deployment 에 PG 표준 env 5개 주입 (owner role-secret 을 secretKeyRef 로 공유).
+    - name: Setup CNPG database (reference)
+      if: steps.config.outputs.db-mode == 'reference' && inputs.service-name != ''
+      uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
+      with:
+        app-name:             ${{ inputs.app-name }}
+        service-name:         ${{ inputs.service-name }}
+        mode:                 reference
+        db-name:              ""
+        ref-db:               ${{ steps.config.outputs.db-ref }}
+        role-name:            ""
+        # reference 모드는 owner 가 이미 sealed 한 secret 을 재사용하므로 credentials·storage 전달 불필요
         r2-account-id:        ${{ inputs.tf-account-id }}
         r2-access-key-id:     ${{ inputs.r2-access-key-id }}
         r2-secret-access-key: ${{ inputs.r2-secret-access-key }}
