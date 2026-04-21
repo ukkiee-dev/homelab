@@ -86,12 +86,13 @@ on:
         required: false
 
 
-permissions:
-  contents: write
-
 jobs:
   create:
     runs-on: ubuntu-latest
+    # workflow_call 에서 top-level permissions 는 GitHub Actions 가 startup_failure 로 거부 (2026-04-21 확인).
+    # job-level 로 이동.
+    permissions:
+      contents: write
 
     steps:
       # ── Validate ───────────────────────────────────────────
