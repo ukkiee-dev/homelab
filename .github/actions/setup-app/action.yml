@@ -918,6 +918,41 @@ runs:
           echo "✅ ArgoCD Application 에 CNPG Cluster ignoreDifferences 추가"
         fi
 
+    # ── Step 3d: AppProject destinations 자동 업데이트 ────────────
+    # Phase 6 pokopia-wiki 교훈: 새 앱 namespace 가 AppProject destinations 에 없으면
+    # ArgoCD 가 "namespace X is not permitted in project Y" 로 sync 거부.
+    #   - apps AppProject  : project=apps Application (CNPG 확장 등) 의 destination 허용
+    #   - infra AppProject : scheduling Application (project=infra) 이 ResourceQuota/LimitRange 를
+    #                         각 앱 namespace 에 배포하기 때문에 필수.
+    # manifests/ 변경이므로 뒤의 Commit & Push 스텝이 `git add manifests/` 로 자동 반영.
+    - name: Update AppProject destinations
+      if: ${{ steps.tunnel.outcome == 'success' || inputs.type == 'worker' }}
+      shell: bash
+      env:
+        APP: ${{ inputs.app-name }}
+      run: |
+        set -euo pipefail
+
+        for proj_file in \
+          _homelab/manifests/infra/argocd/appproject-apps.yaml \
+          _homelab/manifests/infra/argocd/appproject-infra.yaml; do
+
+          if [ ! -f "$proj_file" ]; then
+            echo "⚠️  $proj_file 미존재, 스킵"
+            continue
+          fi
+
+          EXISTS=$(NS="$APP" yq '.spec.destinations | map(.namespace == env(NS)) | any' "$proj_file")
+          if [ "$EXISTS" = "true" ]; then
+            echo "⏭️  $(basename "$proj_file"): $APP destination 이미 존재"
+          else
+            NS="$APP" yq eval -i \
+              '.spec.destinations += [{"namespace": env(NS), "server": "https://kubernetes.default.svc"}]' \
+              "$proj_file"
+            echo "✅ $(basename "$proj_file"): $APP destination 추가"
+          fi
+        done
+
     # ── Step 4: git commit & push (terraform 완료 후) ─────────────
     - name: Commit & Push
       shell: bash
