@@ -1,0 +1,325 @@
+name: Add Database (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        required: true
+        type: string
+      service-name:
+        description: "모노레포 서비스 이름 (services/<name>)"
+        required: true
+        type: string
+      config-yaml:
+        description: ".app-config.yml 내용 (caller 가 읽어 전달)"
+        required: true
+        type: string
+    secrets:
+      APP_ID: { required: true }
+      APP_PRIVATE_KEY: { required: true }
+      TF_ACCOUNT_ID: { required: true }
+      R2_ACCESS_KEY_ID: { required: true }
+      R2_SECRET_ACCESS_KEY: { required: true }
+      TELEGRAM_BOT_TOKEN: { required: false }
+      TELEGRAM_CHAT_ID: { required: false }
+
+jobs:
+  add-database:
+    runs-on: ubuntu-latest
+    # NOTE: caller workflow 에 permissions 상속. 이 파일에는 permissions 블록 금지
+    #       (feedback_workflow_call_permissions.md — reusable startup_failure 방지).
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ukkiee-dev
+          repositories: homelab
+
+      - name: Checkout homelab
+        uses: actions/checkout@v4
+        with:
+          repository: ukkiee-dev/homelab
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Install yq
+        uses: mikefarah/yq@v4
+
+      # Phase 2 의 Parse config 로직 복제 (config-yaml 만 지원 — fallback 불필요).
+      # 이 workflow 는 Phase 2+ 전제라 deprecated inputs 경로 없음.
+      - name: Parse config
+        id: config
+        shell: bash
+        env:
+          APP_NAME: ${{ inputs.app-name }}
+          CONFIG_YAML: ${{ inputs.config-yaml }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$CONFIG_YAML" ]; then
+            echo "::error::config-yaml 비어있음 — caller 가 .app-config.yml 을 전달하지 않았습니다"
+            exit 1
+          fi
+
+          CONFIG_FILE=$(mktemp)
+          trap 'rm -f "$CONFIG_FILE"' EXIT
+          printf '%s\n' "$CONFIG_YAML" > "$CONFIG_FILE"
+
+          RAW_TYPE=$(yq '.type // ""' "$CONFIG_FILE")
+          DB_NAME=$(yq '.database.name // ""' "$CONFIG_FILE")
+          DB_REF=$(yq '.database.ref // ""' "$CONFIG_FILE")
+          DB_STORAGE=$(yq '.database.storage // "10Gi"' "$CONFIG_FILE")
+
+          # type 검증 (setup-app 과 동일)
+          case "$RAW_TYPE" in
+            "") TYPE=http ;;
+            worker) TYPE=worker ;;
+            web|static)
+              echo "::warning::type: $RAW_TYPE 은 deprecated"
+              TYPE=http
+              ;;
+            *)
+              echo "::error::invalid type: $RAW_TYPE"
+              exit 1
+              ;;
+          esac
+
+          # DB 모드 결정
+          if [ -n "$DB_NAME" ] && [ -n "$DB_REF" ]; then
+            echo "::error::database.name 과 database.ref 는 상호 배타"
+            exit 1
+          elif [ -n "$DB_NAME" ]; then
+            DB_MODE=owner
+          elif [ -n "$DB_REF" ]; then
+            DB_MODE=reference
+          else
+            DB_MODE=none
+          fi
+
+          {
+            echo "type=$TYPE"
+            echo "db-mode=$DB_MODE"
+            echo "db-name=$DB_NAME"
+            echo "db-ref=$DB_REF"
+            echo "db-storage=$DB_STORAGE"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "── Parse config 결과 ──────────────"
+          echo "  type=$TYPE db-mode=$DB_MODE"
+          if [ "$DB_MODE" != "none" ]; then
+            echo "  db-name=$DB_NAME db-ref=$DB_REF db-storage=$DB_STORAGE"
+          fi
+
+      # I1: 완전 idempotent + name/ref 변경만 error.
+      # 추가로 service 디렉토리 존재 확인 + db-mode=none 조기 종료.
+      - name: Validate (idempotency + immutability)
+        id: validate
+        shell: bash
+        env:
+          APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service-name }}
+          DB_MODE: ${{ steps.config.outputs.db-mode }}
+          DB_NAME: ${{ steps.config.outputs.db-name }}
+          DB_REF: ${{ steps.config.outputs.db-ref }}
+        run: |
+          set -euo pipefail
+
+          # 1. db-mode=none 이면 조기 종료 (정상)
+          if [ "$DB_MODE" = "none" ]; then
+            echo "::notice::.app-config.yml 에 database 블록 없음 — skip"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 2. service 디렉토리 존재 확인
+          SVC_DIR="manifests/apps/${APP}/services/${SERVICE}"
+          if [ ! -d "$SVC_DIR" ]; then
+            echo "::error::service 디렉토리 없음: $SVC_DIR"
+            echo "::error::먼저 create-app.yml 로 서비스를 생성하세요"
+            exit 1
+          fi
+
+          # 3. 기존 DB 설정 조회 (common/database-shared.yaml)
+          SHARED="manifests/apps/${APP}/common/database-shared.yaml"
+          CURRENT_DB=""
+          if [ -f "$SHARED" ]; then
+            CURRENT_DB=$(yq '.spec.name // ""' "$SHARED")
+            # Normalize yq's literal "null" string (happens when field exists but is explicitly null)
+            [ "$CURRENT_DB" = "null" ] && CURRENT_DB=""
+          fi
+
+          # 4. 기존 reference env 조회 (Deployment env 에서 PGUSER 값 = owner-role = ref 값)
+          DEPLOYMENT="$SVC_DIR/deployment.yaml"
+          CURRENT_PGUSER=""
+          if [ -f "$DEPLOYMENT" ]; then
+            CURRENT_PGUSER=$(yq '.spec.template.spec.containers[0].env // [] | map(select(.name == "PGUSER")) | .[0].value // ""' "$DEPLOYMENT")
+            [ "$CURRENT_PGUSER" = "null" ] && CURRENT_PGUSER=""
+          fi
+
+          # 5. owner 모드 검증
+          if [ "$DB_MODE" = "owner" ]; then
+            if [ -n "$CURRENT_DB" ] && [ "$CURRENT_DB" != "$DB_NAME" ]; then
+              echo "::error::database.name 변경 감지: '$CURRENT_DB' → '$DB_NAME'"
+              echo "::error::DB 이름 변경은 자동 마이그레이션 불가. Runbook 참조:"
+              echo "::error::  docs/runbooks/postgresql/cnpg-new-project.md"
+              exit 1
+            fi
+            if [ -n "$CURRENT_DB" ] && [ "$CURRENT_DB" = "$DB_NAME" ]; then
+              echo "::notice::이미 owner DB 구성 완료 (name=$DB_NAME) — skip"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "✅ owner 모드 신규 구성 대상 (db-name=$DB_NAME)"
+          fi
+
+          # 6. reference 모드 검증
+          if [ "$DB_MODE" = "reference" ]; then
+            # reference target (owner 서비스) 존재 확인은 setup-app/database 의 validate-ref step 이 처리
+            if [ -n "$CURRENT_PGUSER" ] && [ "$CURRENT_PGUSER" != "$DB_REF" ]; then
+              echo "::error::database.ref 변경 감지: '$CURRENT_PGUSER' → '$DB_REF'"
+              echo "::error::reference 변경은 teardown 후 재구성 필요"
+              exit 1
+            fi
+            if [ -n "$CURRENT_PGUSER" ] && [ "$CURRENT_PGUSER" = "$DB_REF" ]; then
+              echo "::notice::이미 reference 구성 완료 (ref=$DB_REF) — skip"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "✅ reference 모드 신규 구성 대상 (db-ref=$DB_REF)"
+          fi
+
+      # db-mode=owner → Cluster + Database CR + role-secret 생성
+      - name: Setup CNPG database (owner)
+        if: ${{ success() && steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'owner' }}
+        uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
+        with:
+          app-name:             ${{ inputs.app-name }}
+          service-name:         ${{ inputs.service-name }}
+          mode:                 owner
+          db-name:              ${{ steps.config.outputs.db-name }}
+          ref-db:               ""
+          role-name:            ""
+          storage:              ${{ steps.config.outputs.db-storage }}
+          r2-account-id:        ${{ secrets.TF_ACCOUNT_ID }}
+          r2-access-key-id:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          homelab-path:         "."
+
+      # db-mode=reference → 서비스 Deployment env 에 PG 5개 주입
+      - name: Setup CNPG database (reference)
+        if: ${{ success() && steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'reference' }}
+        uses: ukkiee-dev/homelab/.github/actions/setup-app/database@main
+        with:
+          app-name:             ${{ inputs.app-name }}
+          service-name:         ${{ inputs.service-name }}
+          mode:                 reference
+          db-name:              ""
+          ref-db:               ${{ steps.config.outputs.db-ref }}
+          role-name:            ""
+          r2-account-id:        ${{ secrets.TF_ACCOUNT_ID }}
+          r2-access-key-id:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          homelab-path:         "."
+
+      # owner 생성 후: 루트 kustomization 에 "common" 추가 + ArgoCD Application 에
+      # CNPG Cluster ignoreDifferences 추가. setup-app/action.yml 과 동일 로직.
+      - name: Update ArgoCD Application for DB (owner post-processing)
+        if: ${{ success() && steps.validate.outputs.skip != 'true' && steps.config.outputs.db-mode == 'owner' }}
+        shell: bash
+        env:
+          APP: ${{ inputs.app-name }}
+        run: |
+          set -euo pipefail
+
+          # 1. 루트 kustomization 에 common/ 추가 (idempotent)
+          ROOT_KUST="manifests/apps/${APP}/kustomization.yaml"
+          if [ -f "$ROOT_KUST" ]; then
+            if ! yq eval '.resources[]' "$ROOT_KUST" | grep -qx "common"; then
+              yq eval -i '.resources = (.resources + ["common"] | unique)' "$ROOT_KUST"
+              echo "✅ 루트 kustomization 에 common/ 추가"
+            else
+              echo "⏭️  루트 kustomization 에 common/ 이미 존재"
+            fi
+          fi
+
+          # 2. ArgoCD Application 에 CNPG Cluster ignoreDifferences 추가 (idempotent via unique_by)
+          APP_FILE="argocd/applications/apps/${APP}.yaml"
+          if [ -f "$APP_FILE" ]; then
+            CLUSTER_NAME="${APP}-pg"
+            APP_NS="$APP" CLUSTER_NAME="$CLUSTER_NAME" yq eval -i '
+              .spec.ignoreDifferences = ((.spec.ignoreDifferences // []) + [{
+                "group": "postgresql.cnpg.io",
+                "kind": "Cluster",
+                "name": env(CLUSTER_NAME),
+                "namespace": env(APP_NS),
+                "jsonPointers": [
+                  "/spec/affinity",
+                  "/spec/bootstrap",
+                  "/spec/enablePDB",
+                  "/spec/enableSuperuserAccess",
+                  "/spec/failoverDelay",
+                  "/spec/logLevel",
+                  "/spec/maxSyncReplicas",
+                  "/spec/minSyncReplicas"
+                ],
+                "jqPathExpressions": [
+                  ".spec.managed.roles[].connectionLimit",
+                  ".spec.managed.roles[].inherit",
+                  ".spec.monitoring.customQueriesConfigMap",
+                  ".spec.monitoring.disableDefaultQueries",
+                  ".spec.plugins[].enabled"
+                ]
+              }] | unique_by(.kind + "/" + .name))
+            ' "$APP_FILE"
+            echo "✅ ArgoCD Application 에 CNPG Cluster ignoreDifferences 추가"
+          fi
+
+      - name: Commit & Push
+        if: ${{ success() && steps.validate.outputs.skip != 'true' }}
+        shell: bash
+        env:
+          APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service-name }}
+          DB_MODE: ${{ steps.config.outputs.db-mode }}
+          DB_NAME: ${{ steps.config.outputs.db-name }}
+          DB_REF: ${{ steps.config.outputs.db-ref }}
+        run: |
+          set -euo pipefail
+          git config user.email "deploy-bot@users.noreply.github.com"
+          git config user.name "deploy-bot[bot]"
+
+          git add manifests/ argocd/
+
+          if git diff --staged --quiet; then
+            echo "변경사항 없음 — 이미 반영됨, 커밋 skip"
+            exit 0
+          fi
+
+          if [ "$DB_MODE" = "owner" ]; then
+            git commit -m "feat(db): add owner DB '${DB_NAME}' to ${APP}/${SERVICE}"
+          else
+            git commit -m "feat(db): add reference to '${DB_REF}' in ${APP}/${SERVICE}"
+          fi
+
+      - name: Push with retry
+        if: ${{ success() && steps.validate.outputs.skip != 'true' }}
+        uses: ./.github/actions/git-push-retry
+
+      # Telegram 알림 (선택)
+      - name: Notify success (Telegram)
+        if: success() && steps.validate.outputs.skip != 'true'
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          APP: ${{ inputs.app-name }}
+          SERVICE: ${{ inputs.service-name }}
+          DB_MODE: ${{ steps.config.outputs.db-mode }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then exit 0; fi
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=🗄️ DB 추가 완료 (${DB_MODE}): ${APP}/${SERVICE}"
