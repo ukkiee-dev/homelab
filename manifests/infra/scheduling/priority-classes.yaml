@@ -20,7 +20,7 @@ metadata:
   name: standard
 value: 100
 globalDefault: true
-description: "L3: homepage, test-web, argocd-image-updater"
+description: "L3: homepage, argocd-image-updater"
 ---
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass

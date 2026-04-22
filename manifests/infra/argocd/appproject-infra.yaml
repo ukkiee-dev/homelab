@@ -32,7 +32,7 @@ spec:
     - namespace: argocd
       server: https://kubernetes.default.svc
     # scheduling application 이 전역 ResourceQuota/LimitRange 를 각 워크로드
-    # 네임스페이스에 배포하기 위해 destinations 확장. apps/monitoring/test-web
+    # 네임스페이스에 배포하기 위해 destinations 확장. apps/monitoring
     # 네임스페이스의 정책만 `infra` project 가 소유한다 — 실제 앱 배포는
     # 각각 apps/monitoring project 에서 수행된다.
     - namespace: apps
