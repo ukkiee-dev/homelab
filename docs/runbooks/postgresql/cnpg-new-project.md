@@ -135,14 +135,14 @@ kubectl -n "$NS" run r2-check --rm -i --restart=Never --image=amazon/aws-cli:lat
 
 ## 시나리오 A: 기존 앱에 DB 추가
 
-> **2026-04-21 자동화 완료**: app-starter `add-database.yml` + homelab `_add-database.yml` 로 자동 처리.
+> **2026-04-22 자동 reconcile**: app-starter `update-app.yml` (push 트리거) + homelab `_add-database.yml` 로 자동 처리. `.app-config.yml` 이 single source of truth — 수동 dispatch 불필요.
 > 설계: [`plans/2026-04-21-add-database-workflow-design.md`](../../plans/2026-04-21-add-database-workflow-design.md)
 
 기존 배포된 서비스에 DB 만 추가하려면 (teardown + create-app 재실행 필요 없음):
 
 ### 절차
 
-1. 앱 레포 `services/<svc>/.app-config.yml` 에 `database` 블록 추가 + push
+1. 앱 레포 `services/<svc>/.app-config.yml` 에 `database` 블록 추가
 
    **owner (신규 DB 생성)**:
    ```yaml
@@ -157,11 +157,11 @@ kubectl -n "$NS" run r2-check --rm -i --restart=Never --image=amazon/aws-cli:lat
      ref: api            # 같은 project 내 owner 서비스 이름
    ```
 
-2. 앱 레포에서 dispatch:
-   ```bash
-   gh workflow run add-database.yml --repo ukkiee-dev/<app> -f service-name=<svc>
-   ```
-   또는 Actions UI → **Add Database** → Run workflow.
+2. **push 만 하면 자동 reconcile**.
+
+   `update-app.yml` 이 `services/*/.app-config.yml` 변경을 감지 → `_add-database.yml` 호출 → DB 프로비저닝 + git push.
+
+   수동 dispatch 가 필요한 경우 (예: 워크플로우 실패 후 재시도) 는 Actions UI → **Update App (reconcile)** → Run workflow (파라미터 없음 — `.app-config.yml` 현재 상태로 reconcile).
 
 ### 자동 처리
 
@@ -181,7 +181,7 @@ kubectl -n "$NS" run r2-check --rm -i --restart=Never --image=amazon/aws-cli:lat
 
 - **모노레포 (service-name 필수)** 앱만 지원. flat 앱은 현재 DB 미지원
 - reference 모드는 **owner 서비스가 이미 배포 완료** 상태여야 함 (common/database-shared.yaml 존재 전제)
-- create-app 시점에 database 블록이 있었으면 이미 DB 가 있는 것이므로, add-database 는 skip (멱등) — 후속 DB 추가용
+- create-app 시점에 database 블록이 있었으면 이미 DB 가 있는 것이므로, 재push 시 reconcile 은 skip (멱등) — 후속 DB 추가용
 
 ## 시나리오 C: 수동 템플릿 복사 (긴급·참조)
 
