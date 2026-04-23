@@ -51,6 +51,9 @@ data:
 
   rules.yaml: |
     apiVersion: 1
+    deleteRules:
+      - orgId: 1
+        uid: traefik-config-error-log
     groups:
       - orgId: 1
         name: pod-alerts
@@ -1571,22 +1574,34 @@ data:
               dashboardUid: "infra-alerts-overview"
               panelId: "1"
 
-          - uid: traefik-config-error-log
-            title: Traefik config/provider 에러 로그 폭증
-            # VictoriaLogs LogsQL 기반. config/router/provider 빌드 실패 메시지
-            # 패턴을 5분 rate 로 집계. reload counter 가 실패 시 증가하는지
-            # 불확실한 v3 상황에서 reload 실패 감지의 primary 채널로 운용.
-            # NOTE: 해당 datasource 가 Grafana unified alerting 과 호환되는지
-            # 최초 발화 시 검증 필요 — 로그 확인 후 유효하지 않으면 제거.
+      - orgId: 1
+        name: cnpg-alerts
+        folder: Infra
+        interval: 1m
+        # Phase 5 Task 5.4: CloudNativePG 4종 알람.
+        # Phase 3 Task 3.8 `_workspace/cnpg-migration/10_cnpg-metrics.txt` 에서 메트릭 실존 검증 완료.
+        # 리뷰 M8: cnpg_collector_pg_wal_archive_status 의 라벨 키 `value` 확인.
+        # 리뷰 H5: CNPGPVCDiskPressure 는 cnpg.io/cluster 라벨 기반 (정규식 대신).
+        rules:
+          - uid: cnpg-collector-down
+            title: CNPG exporter down
+            # CNPG Pod 가 존재하는데 cnpg_collector_up == 1 이 아닌 경우만 알림.
+            # noData 는 "현재 CNPG Cluster 없음" 일 수 있으므로 정상 상태로 처리.
             condition: C
             data:
               - refId: A
                 relativeTimeRange:
                   from: 300
                   to: 0
-                datasourceUid: victorialogs
+                datasourceUid: victoriametrics
                 model:
-                  expr: '{app_kubernetes_io_name="traefik",namespace="traefik-system"} AND level:error AND (msg:"Error while building" OR msg:"Error starting provider aggregator" OR msg:"cannot retrieve the providers" OR msg:"Cannot create service" OR msg:"Cannot build the router") | stats count() as errors'
+                  expr: |
+                    max by (namespace, pod, label_cnpg_io_cluster) (
+                      kube_pod_labels{label_cnpg_io_cluster!=""}
+                    )
+                    unless on (namespace, pod)
+                    (cnpg_collector_up == 1)
+                  instant: true
                   refId: A
               - refId: B
                 relativeTimeRange:
@@ -1614,70 +1629,13 @@ data:
                   refId: C
             noDataState: OK
             execErrState: Error
-            for: 2m
-            labels:
-              severity: warning
-            annotations:
-              summary: "Traefik config/router 빌드 에러 로그 5분간 {{ $value }}건 — reload 실패 가능"
-              dashboardUid: "infra-alerts-overview"
-              panelId: "1"
-
-      - orgId: 1
-        name: cnpg-alerts
-        folder: Infra
-        interval: 1m
-        # Phase 5 Task 5.4: CloudNativePG 4종 알람.
-        # Phase 3 Task 3.8 `_workspace/cnpg-migration/10_cnpg-metrics.txt` 에서 메트릭 실존 검증 완료.
-        # 리뷰 M8: cnpg_collector_pg_wal_archive_status 의 라벨 키 `value` 확인.
-        # 리뷰 H5: CNPGPVCDiskPressure 는 cnpg.io/cluster 라벨 기반 (정규식 대신).
-        rules:
-          - uid: cnpg-collector-down
-            title: CNPG exporter down
-            # cnpg_collector_up == 1 정상. 0 이면 exporter 장애 또는 pod not ready.
-            condition: C
-            data:
-              - refId: A
-                relativeTimeRange:
-                  from: 300
-                  to: 0
-                datasourceUid: victoriametrics
-                model:
-                  expr: cnpg_collector_up
-                  instant: true
-                  refId: A
-              - refId: B
-                relativeTimeRange:
-                  from: 300
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: reduce
-                  expression: A
-                  reducer: last
-                  refId: B
-              - refId: C
-                relativeTimeRange:
-                  from: 300
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: threshold
-                  expression: B
-                  conditions:
-                    - evaluator:
-                        type: lt
-                        params:
-                          - 1
-                  refId: C
-            noDataState: Alerting
-            execErrState: Error
             for: 5m
             labels:
               severity: critical
               category: database
             annotations:
-              summary: "CNPG exporter down — {{ $labels.cluster }} ({{ $labels.namespace }}): value={{ $value }}"
-              description: "cnpg_collector_up 이 5분간 1 이 아님. pod 상태·NetworkPolicy·scrape 경로 점검."
+              summary: "CNPG exporter down — {{ $labels.label_cnpg_io_cluster }} ({{ $labels.namespace }}/{{ $labels.pod }})"
+              description: "CNPG Pod 는 존재하지만 cnpg_collector_up==1 이 아님. pod 상태·annotation·NetworkPolicy·scrape 경로 점검."
               dashboardUid: "cnpg-cluster"
 
           - uid: cnpg-backup-too-old
