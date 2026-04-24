@@ -54,6 +54,8 @@ data:
     deleteRules:
       - orgId: 1
         uid: traefik-config-error-log
+      - orgId: 1
+        uid: traefik-reload-heartbeat
     groups:
       - orgId: 1
         name: pod-alerts
@@ -1522,55 +1524,6 @@ data:
               severity: warning
             annotations:
               summary: "Traefik /metrics scrape 5분간 실패 — 메트릭 수집 중단"
-              dashboardUid: "infra-alerts-overview"
-              panelId: "1"
-
-          - uid: traefik-reload-heartbeat
-            title: Traefik reload heartbeat 정체
-            # 24시간 이상 reload 이벤트가 전혀 없음 = provider watch 고장 또는
-            # kubernetescrd informer 데드락 신호. symptom 이 아닌 liveness 검증용.
-            condition: C
-            data:
-              - refId: A
-                relativeTimeRange:
-                  from: 86400
-                  to: 0
-                datasourceUid: victoriametrics
-                model:
-                  expr: (time() - traefik_config_last_reload_success{app_kubernetes_io_name="traefik",namespace="traefik-system"}) > 86400
-                  instant: true
-                  refId: A
-              - refId: B
-                relativeTimeRange:
-                  from: 86400
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: reduce
-                  expression: A
-                  reducer: last
-                  refId: B
-              - refId: C
-                relativeTimeRange:
-                  from: 86400
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: threshold
-                  expression: B
-                  conditions:
-                    - evaluator:
-                        type: gt
-                        params:
-                          - 0
-                  refId: C
-            noDataState: OK
-            execErrState: Error
-            for: 10m
-            labels:
-              severity: warning
-            annotations:
-              summary: "Traefik config reload 24시간 정체 — provider watch 고장 의심"
               dashboardUid: "infra-alerts-overview"
               panelId: "1"
 

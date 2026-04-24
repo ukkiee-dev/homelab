@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/part-of: homelab
         app.kubernetes.io/managed-by: argocd
       annotations:
-        grafana-alerting-reload: "2026-04-23-alert-datasource-nodata-v1"
+        grafana-alerting-reload: "2026-04-24-traefik-reload-heartbeat-v1"
     spec:
       priorityClassName: core-services
       securityContext:
