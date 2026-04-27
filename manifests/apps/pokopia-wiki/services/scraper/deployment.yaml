@@ -42,7 +42,7 @@ spec:
           emptyDir: {}
       containers:
         - name: scraper
-          image: ghcr.io/ukkiee-dev/pokopia-wiki-scraper:206b4ac186fa34251fe3a592f1699c0bc9150f6d
+          image: ghcr.io/ukkiee-dev/pokopia-wiki-scraper:7bd750d5241113428af956b1b6fa2421aef39c50
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
