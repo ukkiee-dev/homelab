@@ -11,7 +11,11 @@ metadata:
     app.kubernetes.io/managed-by: argocd
 spec:
   revisionHistoryLimit: 3
-  replicas: 1
+  # scraper 는 CLI 도구라 인자 없이 실행되면 process.exit(1) → CrashLoop.
+  # 운영 패턴 결정 전까지 (CronJob 변환 / node-cron daemon / 수동 dispatch)
+  # replicas=0 으로 두어 alarm 노이즈 차단. _update-image.yml 이 향후 1 로 다시
+  # bump 할 수 있으니 본 PR 은 일시적 — 영구 fix 는 별도 PR 권장.
+  replicas: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: scraper
