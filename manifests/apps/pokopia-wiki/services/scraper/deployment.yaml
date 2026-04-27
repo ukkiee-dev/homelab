@@ -11,7 +11,7 @@ metadata:
     app.kubernetes.io/managed-by: argocd
 spec:
   revisionHistoryLimit: 3
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: scraper
@@ -42,7 +42,7 @@ spec:
           emptyDir: {}
       containers:
         - name: scraper
-          image: ghcr.io/ukkiee-dev/pokopia-wiki-scraper:latest
+          image: ghcr.io/ukkiee-dev/pokopia-wiki-scraper:c2b7514883c06e1baeb4e4dbc2aad94965f8164c
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
