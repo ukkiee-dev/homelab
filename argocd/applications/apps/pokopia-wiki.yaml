@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pokopia-wiki
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: apps
+  source:
+    repoURL: https://github.com/ukkiee-dev/homelab.git
+    targetRevision: main
+    path: manifests/apps/pokopia-wiki
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pokopia-wiki
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: postgresql.cnpg.io
+      kind: Cluster
+      name: pokopia-wiki-pg
+      namespace: pokopia-wiki
+      jsonPointers:
+        - /spec/affinity
+        - /spec/bootstrap
+        - /spec/enablePDB
+        - /spec/enableSuperuserAccess
+        - /spec/failoverDelay
+        - /spec/logLevel
+        - /spec/maxSyncReplicas
+        - /spec/minSyncReplicas
+      jqPathExpressions:
+        - .spec.managed.roles[].connectionLimit
+        - .spec.managed.roles[].inherit
+        - .spec.monitoring.customQueriesConfigMap
+        - .spec.monitoring.disableDefaultQueries
+        - .spec.plugins[].enabled

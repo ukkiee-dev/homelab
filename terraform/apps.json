@@ -1,1 +1,5 @@
-{}
+{
+  "pokopia-wiki-api": {
+    "subdomain": "pokopia-wiki-api"
+  }
+}

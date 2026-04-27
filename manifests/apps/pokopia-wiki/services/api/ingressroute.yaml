@@ -1,0 +1,31 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: api
+  namespace: pokopia-wiki
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: pokopia-wiki
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: "Apps"
+    gethomepage.dev/name: "pokopia-wiki/api"
+    gethomepage.dev/icon: "mdi-database"
+    gethomepage.dev/href: "https://pokopia-wiki-api.ukkiee.dev"
+    gethomepage.dev/description: "Pokopia Wiki — Serebii/PokopiaGuide 기반 도감 API + DB owner"
+    gethomepage.dev/pod-selector: "app.kubernetes.io/name=api"
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`pokopia-wiki-api.ukkiee.dev`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+          namespace: traefik-system
+        - name: gzip
+          namespace: traefik-system
+      services:
+        - name: api
+          port: 3000

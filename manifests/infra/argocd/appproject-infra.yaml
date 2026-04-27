@@ -45,6 +45,8 @@ spec:
     # Phase 2 (CNPG migration): operator + plugin 전용 namespace
     - namespace: cnpg-system
       server: https://kubernetes.default.svc
+    - namespace: pokopia-wiki
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

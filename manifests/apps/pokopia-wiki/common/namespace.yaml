@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pokopia-wiki
+  labels:
+    app.kubernetes.io/name: pokopia-wiki
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
