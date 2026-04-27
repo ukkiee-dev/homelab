@@ -149,8 +149,14 @@ runs:
         done
 
         # 3. Database CR (시나리오-1 공유 DB 가정. 시나리오-2 는 후속 확장에서 services/<svc>/database.yaml 로 분리)
+        # K8s metadata.name 은 RFC 1123 강제 (소문자 영숫자 + - + .). underscore 금지.
+        # spec.name (실제 PG database 이름) 은 PG 표준 underscore 유지. 두 값을 분리.
+        # 변환: pokopia_wiki → pokopia-wiki-db (suffix `-db` 로 다른 K8s 리소스명과 충돌 회피).
+        # 선결 사례: ukkiee-dev/homelab#42 (pokopia-wiki manual fix).
+        DB_K8S_NAME="$(printf '%s' "$DB" | tr '_' '-')-db"
         sed \
           -e "s|__APP__|${APP}|g" \
+          -e "s|__DB_K8S_NAME__|${DB_K8S_NAME}|g" \
           -e "s|__DB_NAME__|${DB}|g" \
           -e "s|__ROLE_NAME__|${ROLE}|g" \
           "${TEMPLATE_DIR}/database.yaml.tpl" \
