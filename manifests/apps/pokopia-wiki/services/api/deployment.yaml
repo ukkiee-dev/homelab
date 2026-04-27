@@ -42,7 +42,7 @@ spec:
           emptyDir: {}
       containers:
         - name: api
-          image: ghcr.io/ukkiee-dev/pokopia-wiki-api:c2b7514883c06e1baeb4e4dbc2aad94965f8164c
+          image: ghcr.io/ukkiee-dev/pokopia-wiki-api:206b4ac186fa34251fe3a592f1699c0bc9150f6d
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
