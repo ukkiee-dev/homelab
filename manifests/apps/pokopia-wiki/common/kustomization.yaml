@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: pokopia-wiki
 resources:
   - namespace.yaml
+  - ghcr-pull-secret.sealed.yaml
   - role-secrets.sealed.yaml
   - r2-backup.sealed.yaml
   - cluster.yaml
