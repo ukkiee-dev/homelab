@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scraper
+  namespace: pokopia-wiki
+  labels:
+    app.kubernetes.io/name: scraper
+    app.kubernetes.io/part-of: pokopia-wiki
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/version: latest
+    app.kubernetes.io/managed-by: argocd
+spec:
+  revisionHistoryLimit: 3
+  replicas: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: scraper
+      app.kubernetes.io/part-of: pokopia-wiki
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: scraper
+        app.kubernetes.io/part-of: pokopia-wiki
+        app.kubernetes.io/version: latest
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: scraper
+          image: ghcr.io/ukkiee-dev/pokopia-wiki-scraper:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          env:
+            - name: PGHOST
+              value: pokopia-wiki-pg-rw.pokopia-wiki.svc
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: pokopia_wiki
+            - name: PGUSER
+              value: api
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pokopia-wiki-pg-api-credentials
+                  key: password
